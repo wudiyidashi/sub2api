@@ -220,6 +220,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -r "$RUNNER_TEMP/release-tools/requirements-release.txt"
+      - name: Prepare pinned Codex account-driver source
+        run: sh drivers/codex-rs/prepare-upstream.sh
       - name: Verify complete matrix and prepare Docker contexts
         run: |
           args=(--version "$RELEASE_VERSION" --sha "$RELEASE_SHA" --input release-input --output .release-context)

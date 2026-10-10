@@ -34,6 +34,7 @@ Please read the following carefully before using this project:
 - OpenAI accounts now support managed Codex HTTP/SSE and WebSocket drivers with runtime maintenance and hot upgrades.
 - Content Audit now preserves and displays HTTP and WebSocket request/response contents, with usage-style filters and frame-level detail views.
 - GitHub release checks and panel updates can use the operator repository configured by `UPDATE_GITHUB_REPO`.
+- Complete GitHub releases now provide amd64 and arm64 multi-architecture images with the enhanced Codex account driver included.
 
 完整更新记录见 [docs/releases/release-notes.md](docs/releases/release-notes.md)。
 

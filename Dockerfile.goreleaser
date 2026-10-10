@@ -1,63 +1,75 @@
 # =============================================================================
-# Sub2API Dockerfile for GoReleaser
+# Sub2API release image
 # =============================================================================
-# This Dockerfile is used by GoReleaser to build Docker images.
-# It only packages the pre-built binary, no compilation needed.
+# GoReleaser supplies the pre-built gateway binary. The release context also
+# contains the pinned Codex account-driver source prepared by the workflow.
+# The driver is compiled for the image architecture so the published amd64
+# and arm64 images both include HTTP, SSE, and WebSocket account transport.
 # =============================================================================
 
-ARG ALPINE_IMAGE=alpine:3.21
-ARG POSTGRES_IMAGE=postgres:18-alpine
+ARG RUST_IMAGE=rust:1.97-slim-bookworm
+ARG RUNTIME_IMAGE=postgres:18-bookworm
 
-FROM ${POSTGRES_IMAGE} AS pg-client
+FROM ${RUST_IMAGE} AS driver-builder
 
-FROM ${ALPINE_IMAGE}
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    pkg-config \
+    libssl-dev \
+    protobuf-compiler \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV CARGO_BUILD_JOBS=2
+WORKDIR /workspace/drivers/codex-rs
+COPY drivers/codex-rs/ ./
+COPY backend/pkg/accountdriverapi/v1/account_driver.proto /workspace/backend/pkg/accountdriverapi/v1/account_driver.proto
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/workspace/drivers/codex-rs/target \
+    cargo build --release --locked \
+    && cp target/release/sub2api-codex-account-driver /sub2api-codex-account-driver
+
+FROM ${RUNTIME_IMAGE}
 
 LABEL maintainer="Wei-Shaw <github.com/Wei-Shaw>"
 LABEL description="Sub2API - AI API Gateway Platform"
 LABEL org.opencontainers.image.source="https://github.com/Wei-Shaw/sub2api"
 
-# Install runtime dependencies
-RUN apk add --no-cache \
+# The PostgreSQL base provides version-matched pg_dump/psql tools and gosu is
+# used by the account-driver entrypoint to drop privileges before startup.
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     tzdata \
-    curl \
-    su-exec \
-    libpq \
-    zstd-libs \
-    lz4-libs \
-    krb5-libs \
-    libldap \
-    libedit \
-    && rm -rf /var/cache/apk/*
+    wget \
+    gosu \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy pg_dump and psql from a version-matched PostgreSQL image so backup and
-# restore work in the runtime container without requiring Docker socket access.
-COPY --from=pg-client /usr/local/bin/pg_dump /usr/local/bin/pg_dump
-COPY --from=pg-client /usr/local/bin/psql /usr/local/bin/psql
-COPY --from=pg-client /usr/local/lib/libpq.so.5* /usr/local/lib/
-
-# Create non-root user
-RUN addgroup -g 1000 sub2api && \
-    adduser -u 1000 -G sub2api -s /bin/sh -D sub2api
+RUN groupadd --gid 1000 sub2api && \
+    useradd --uid 1000 --gid 1000 --create-home --shell /bin/sh sub2api
 
 WORKDIR /app
 
-# Copy the pre-built binary and runtime fallback resources from GoReleaser
-COPY sub2api /app/sub2api
+COPY --chown=sub2api:sub2api sub2api /app/sub2api
 COPY --chown=sub2api:sub2api backend/resources /app/resources
+COPY --from=driver-builder /sub2api-codex-account-driver /app/drivers/sub2api-codex-account-driver
+COPY deploy/docker-entrypoint.account-drivers.sh /app/docker-entrypoint.account-drivers.sh
 
-# Create data directory
-RUN mkdir -p /app/data && chown -R sub2api:sub2api /app
+RUN chmod 0555 /app/sub2api /app/drivers/sub2api-codex-account-driver /app/docker-entrypoint.account-drivers.sh \
+    && mkdir -p /app/data \
+    && chown -R sub2api:sub2api /app \
+    && sha256sum /app/drivers/sub2api-codex-account-driver | cut -d ' ' -f 1 > /app/drivers/codex-rs-http.sha256 \
+    && chmod 0444 /app/drivers/codex-rs-http.sha256
 
-# Copy entrypoint script (fixes volume permissions then drops to sub2api)
-COPY deploy/docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
+ENV ACCOUNT_DRIVERS_CODEX_RS_HTTP_ENABLED=true \
+    ACCOUNT_DRIVERS_CODEX_RS_HTTP_EXECUTABLE_PATH=/app/drivers/sub2api-codex-account-driver \
+    ACCOUNT_DRIVERS_CODEX_RS_HTTP_START_TIMEOUT_SECONDS=10
 
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:${SERVER_PORT:-8080}/health || exit 1
+    CMD wget -q -T 5 -O /dev/null http://localhost:${SERVER_PORT:-8080}/health || exit 1
 
-# Run the application (entrypoint fixes /app/data ownership then execs as sub2api)
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+ENTRYPOINT ["/app/docker-entrypoint.account-drivers.sh"]
 CMD ["/app/sub2api"]

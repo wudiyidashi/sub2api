@@ -152,6 +152,12 @@ def contexts(args):
         (dest / 'deploy').mkdir(exist_ok=True)
         shutil.copy2('deploy/docker-entrypoint.sh', dest / 'deploy/docker-entrypoint.sh')
         shutil.copytree('backend/resources', dest / 'backend/resources', dirs_exist_ok=True)
+        # Release images compile the pinned Codex driver for each target architecture.
+        driver_ignore = shutil.ignore_patterns('target', '.git', '*.ps1', 'README.md', 'verification.md')
+        shutil.copytree('drivers/codex-rs', dest / 'drivers/codex-rs', dirs_exist_ok=True, ignore=driver_ignore)
+        proto = dest / 'backend/pkg/accountdriverapi/v1'
+        proto.mkdir(parents=True, exist_ok=True)
+        shutil.copy2('backend/pkg/accountdriverapi/v1/account_driver.proto', proto / 'account_driver.proto')
 
 
 def main():
