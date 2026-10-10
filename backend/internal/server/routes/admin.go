@@ -46,6 +46,13 @@ func RegisterAdminRoutes(
 		// 账号管理
 		registerAccountRoutes(admin, h, stepUpAuth)
 
+		contentAudit := admin.Group("/content-audit")
+		contentAudit.GET("/requests", h.Admin.ContentAudit.ListRequests)
+		contentAudit.GET("/requests/:request_id", h.Admin.ContentAudit.GetRequest)
+		contentAudit.GET("/requests/:request_id/attempts", h.Admin.ContentAudit.ListAttempts)
+		contentAudit.GET("/requests/:request_id/payloads", h.Admin.ContentAudit.ListRawPayloads)
+		contentAudit.GET("/errors/:error_id/payload", h.Admin.ContentAudit.GetErrorPayload)
+
 		// 公告管理
 		registerAnnouncementRoutes(admin, h)
 
@@ -355,6 +362,11 @@ func registerGroupRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 }
 
 func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {
+	admin.GET("/account-drivers", h.Admin.Account.ListDrivers)
+	admin.GET("/account-drivers/runtime", h.Admin.Account.GetDriverRuntime)
+	admin.POST("/account-drivers/runtime/upgrade", gin.HandlerFunc(stepUpAuth), h.Admin.Account.UpgradeDriverRuntime)
+	admin.POST("/account-drivers/runtime/rollback", gin.HandlerFunc(stepUpAuth), h.Admin.Account.RollbackDriverRuntime)
+	admin.POST("/account-drivers/runtime/drain", gin.HandlerFunc(stepUpAuth), h.Admin.Account.DrainDriverRuntime)
 	accounts := admin.Group("/accounts")
 	{
 		accounts.GET("", h.Admin.Account.List)
@@ -367,6 +379,9 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 		accounts.GET("/opencode-go-usage/settings", h.Admin.Account.GetOpenCodeGoUsageSettings)
 		accounts.PUT("/opencode-go-usage/settings", h.Admin.Account.UpdateOpenCodeGoUsageSettings)
 		accounts.GET("/:id", h.Admin.Account.GetByID)
+		accounts.GET("/:id/driver-maintenance", h.Admin.Account.GetDriverMaintenance)
+		accounts.POST("/:id/driver-switch", h.Admin.Account.SwitchDriver)
+		accounts.POST("/:id/driver-maintenance/cancel", h.Admin.Account.CancelDriverMaintenance)
 		accounts.GET("/:id/claude/reset-credits", h.Admin.Account.ClaudeResetCredits)
 		// Same protection as the Codex reset-quota route (admin auth, audit, compliance guard).
 		accounts.POST("/:id/claude/reset-credits/redeem", h.Admin.Account.RedeemClaudeResetCredit)

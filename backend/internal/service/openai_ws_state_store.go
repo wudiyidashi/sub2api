@@ -75,6 +75,10 @@ type OpenAIWSStateStore interface {
 	BindResponseConn(responseID, connID string, ttl time.Duration)
 	GetResponseConn(responseID string) (string, bool)
 	DeleteResponseConn(responseID string)
+	// InvalidateAccount removes local/redis response ownership and connection
+	// anchors for an account whose driver binding is changing. Response IDs
+	// are never portable across a driver generation.
+	InvalidateAccount(context.Context, int64) error
 
 	BindSessionTurnState(groupID int64, sessionHash, turnState string, ttl time.Duration)
 	GetSessionTurnState(groupID int64, sessionHash string) (string, bool)
@@ -329,6 +333,50 @@ func (s *defaultOpenAIWSStateStore) DeleteResponseConn(responseID string) {
 	s.responseToConnMu.Lock()
 	delete(s.responseToConn, id)
 	s.responseToConnMu.Unlock()
+}
+
+func (s *defaultOpenAIWSStateStore) InvalidateAccount(ctx context.Context, accountID int64) error {
+	if s == nil || accountID <= 0 {
+		return nil
+	}
+	// Keep the response-account map as the ownership index. Removing its
+	// entries also lets us remove the corresponding response->connection
+	// anchors; native continuation must not reuse a managed socket's lineage.
+	type binding struct {
+		groupID    int64
+		responseID string
+	}
+	var bindings []binding
+	s.responseToAccountMu.Lock()
+	for key, value := range s.responseToAccount {
+		if value.accountID != accountID {
+			continue
+		}
+		separator := strings.IndexByte(key, ':')
+		if separator <= 0 || separator+1 >= len(key) {
+			delete(s.responseToAccount, key)
+			continue
+		}
+		var groupID int64
+		if _, err := fmt.Sscan(key[:separator], &groupID); err != nil {
+			delete(s.responseToAccount, key)
+			continue
+		}
+		responseID := key[separator+1:]
+		bindings = append(bindings, binding{groupID: groupID, responseID: responseID})
+		delete(s.responseToAccount, key)
+	}
+	s.responseToAccountMu.Unlock()
+	if len(bindings) == 0 {
+		return nil
+	}
+	for _, item := range bindings {
+		s.DeleteResponseConn(item.responseID)
+		if err := s.DeleteResponseAccount(ctx, item.groupID, item.responseID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *defaultOpenAIWSStateStore) BindSessionTurnState(groupID int64, sessionHash, turnState string, ttl time.Duration) {

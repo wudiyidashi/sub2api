@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/accountdriver"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
@@ -22,6 +23,8 @@ import (
 )
 
 type Account struct {
+	AccountDriverID         string
+	AccountDriverRevision   int64
 	ID                      int64
 	Name                    string
 	Notes                   *string
@@ -86,6 +89,14 @@ type Account struct {
 }
 
 type OpenAIEndpointCapability string
+
+// EffectiveAccountDriverID preserves old snapshots lacking binding fields.
+func (a *Account) EffectiveAccountDriverID() string {
+	if a == nil || strings.TrimSpace(a.AccountDriverID) == "" {
+		return accountdriver.NativeID
+	}
+	return strings.TrimSpace(a.AccountDriverID)
+}
 
 const openAILongContextBillingEnabledKey = "openai_long_context_billing_enabled"
 

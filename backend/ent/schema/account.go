@@ -71,6 +71,10 @@ func (Account) Fields() []ent.Field {
 			MaxLen(20).
 			NotEmpty(),
 
+		// Credential refreshes never rewrite the management preset binding.
+		field.String("account_driver_id").Default("native").MaxLen(64).NotEmpty(),
+		field.Int64("account_driver_revision").Default(1).Positive(),
+
 		// credentials: 认证凭证，以 JSONB 格式存储
 		// 结构取决于 type 字段：
 		// - api_key: {"api_key": "sk-xxx"}

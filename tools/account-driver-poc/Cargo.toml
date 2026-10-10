@@ -1,0 +1,31 @@
+[package]
+name = "account-driver-poc"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[dependencies]
+provider-openai = { path = "upstream/backend/crates/providers/openai" }
+gateway-protocol = { path = "upstream/backend/crates/gateway-protocol" }
+futures = "0.3.32"
+reqwest = { version = "=0.12.28", features = ["stream"] }
+serde_json = { version = "1.0.150", features = ["preserve_order"] }
+tokio = { version = "=1.52.3", features = ["macros", "rt-multi-thread", "io-util", "io-std", "net", "sync"] }
+tokio-stream = { version = "0.1.17", features = ["net"] }
+tokio-util = { version = "0.7.18", features = ["rt"] }
+tonic = "0.12.3"
+prost = "0.13.5"
+
+[build-dependencies]
+tonic-build = "0.12.3"
+
+[patch.crates-io]
+hyper-util = { git = "https://github.com/hyperium/hyper-util", rev = "191b1acf0a6b18e807e4abf5a6d4a7c47979ecd6" }
+
+[profile.dev]
+debug = 0
+
+[lints.rust]
+unsafe_code = "forbid"
+

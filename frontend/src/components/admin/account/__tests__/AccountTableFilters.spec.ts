@@ -18,7 +18,7 @@ vi.mock('vue-i18n', async () => {
 })
 
 const defaultFilters = () => ({
-  platform: '', type: '', status: '', privacy_mode: '', group: '',
+  platform: '', type: '', status: '', privacy_mode: '', group: '', account_driver_id: '',
   search: 'existing search', lite: '1', sort_by: 'priority', sort_order: 'asc'
 })
 
@@ -92,7 +92,8 @@ describe('AccountTableFilters', () => {
       ['status', ['', 'active', 'inactive', 'error', 'rate_limited', 'temp_unschedulable', 'unschedulable']],
       ['type', ['', 'oauth', 'setup-token', 'apikey', 'bedrock']],
       ['privacy_mode', ['', '__unset__', 'training_off', 'training_set_cf_blocked', 'training_set_failed']],
-      ['group', ['', 'ungrouped', '42']]
+      ['group', ['', 'ungrouped', '42']],
+      ['account_driver_id', ['', 'native']]
     ] as const
     let changes = 0
     for (const [index, [key, values]] of expectedOptions.entries()) {
@@ -126,6 +127,16 @@ describe('AccountTableFilters', () => {
     expect(wrapper.emitted('change')).toEqual([[]])
     expect(wrapper.emitted('update:filters')).toBeUndefined()
     wrapper.unmount()
+  })
+
+  it('allows filtering saved enhanced bindings even when they are absent from the ready catalogue', async () => {
+    const wrapper = mountFilters({ ...defaultFilters(), account_driver_id: 'codex-rs-http' })
+    await wrapper.setProps({ drivers: [{ id: 'codex-rs-http', name: 'Saved Codex HTTP/SSE' }] })
+    await wrapper.get('button[aria-controls]').trigger('click')
+    const select = wrapper.findAllComponents(Select).at(-1)!
+    expect(select.props('modelValue')).toBe('codex-rs-http')
+    expect(select.props('options').at(-1)).toEqual({ value: 'codex-rs-http', label: 'admin.accounts.accountDriver.enhanced' })
+    expect(wrapper.get('button[aria-controls] span').text()).toBe('1')
   })
 
   it('uses shrinkable, wrapping controls and unique panel IDs for multiple instances', () => {

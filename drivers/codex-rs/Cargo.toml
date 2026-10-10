@@ -1,0 +1,34 @@
+[package]
+name = "sub2api-codex-account-driver"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[dependencies]
+provider-openai = { path = "upstream/backend/crates/providers/openai" }
+gateway-core = { path = "upstream/backend/crates/gateway-core" }
+futures = "0.3.32"
+async-stream = "0.3.6"
+sha2 = "0.11.0"
+tokio-tungstenite = { git = "https://github.com/openai-oss-forks/tokio-tungstenite", rev = "0e5b2d73aa18dd9f0a50ee9ff199d5aef7594186", features = ["proxy", "rustls-tls-native-roots"] }
+reqwest = { version = "=0.12.28", features = ["stream"] }
+serde_json = "1.0.150"
+tokio = { version = "=1.52.3", features = ["macros", "rt-multi-thread", "io-util", "io-std", "net", "sync"] }
+tokio-stream = { version = "0.1.17", features = ["net"] }
+tokio-util = { version = "0.7.18", features = ["rt"] }
+tonic = "0.12.3"
+prost = "0.13.5"
+
+[build-dependencies]
+serde_json = "1.0.150"
+tonic-build = "0.12.3"
+
+[patch.crates-io]
+hyper-util = { git = "https://github.com/hyperium/hyper-util", rev = "191b1acf0a6b18e807e4abf5a6d4a7c47979ecd6" }
+
+[profile.dev]
+debug = 0
+
+[lints.rust]
+unsafe_code = "forbid"

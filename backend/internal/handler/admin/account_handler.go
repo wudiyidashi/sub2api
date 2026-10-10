@@ -51,6 +51,7 @@ func NewOAuthHandler(oauthService *service.OAuthService) *OAuthHandler {
 type AccountHandler struct {
 	claudeResetCredits      claudeResetReader
 	adminService            service.AdminService
+	accountDriverRuntime    *service.AccountDriverManager
 	oauthService            *service.OAuthService
 	openaiOAuthService      *service.OpenAIOAuthService
 	geminiOAuthService      *service.GeminiOAuthService
@@ -121,6 +122,8 @@ func NewAccountHandler(
 
 // CreateAccountRequest represents create account request
 type CreateAccountRequest struct {
+	AccountDriverID         string         `json:"account_driver_id"`
+	DriverSettings          map[string]any `json:"driver_settings"`
 	Name                    string         `json:"name" binding:"required"`
 	Notes                   *string        `json:"notes"`
 	Platform                string         `json:"platform" binding:"required"`
@@ -142,6 +145,8 @@ type CreateAccountRequest struct {
 // UpdateAccountRequest represents update account request
 // 使用指针类型来区分"未提供"和"设置为0"
 type UpdateAccountRequest struct {
+	AccountDriverID         string         `json:"account_driver_id"`
+	DriverSettings          map[string]any `json:"driver_settings"`
 	Name                    string         `json:"name"`
 	Notes                   *string        `json:"notes"`
 	Type                    string         `json:"type" binding:"omitempty,oneof=oauth setup-token apikey upstream bedrock service_account"`
@@ -181,12 +186,13 @@ type BulkUpdateAccountsRequest struct {
 }
 
 type BulkUpdateAccountFilters struct {
-	Platform    string `json:"platform"`
-	Type        string `json:"type"`
-	Status      string `json:"status"`
-	Group       string `json:"group"`
-	Search      string `json:"search"`
-	PrivacyMode string `json:"privacy_mode"`
+	AccountDriverID string `json:"account_driver_id"`
+	Platform        string `json:"platform"`
+	Type            string `json:"type"`
+	Status          string `json:"status"`
+	Group           string `json:"group"`
+	Search          string `json:"search"`
+	PrivacyMode     string `json:"privacy_mode"`
 }
 
 // CheckMixedChannelRequest represents check mixed channel risk request
@@ -624,13 +630,20 @@ func (h *AccountHandler) listAccountSchedulerScoreFilterPool(
 	platform, accountType, status, search string,
 	groupID int64,
 	privacyMode string,
+	driverID string,
 ) []service.Account {
 	if h.adminService == nil || (platform != "" && platform != service.PlatformOpenAI) {
 		return nil
 	}
 	// 池只用于 OpenAI 分数计算（非 OpenAI 账号会在打分时被丢弃），
 	// 无论列表页平台过滤为何，查询一律限定 openai，避免无过滤时全表扫描。
-	accounts, err := h.adminService.ListAccountsForSchedulerScoreFilter(ctx, service.PlatformOpenAI, accountType, status, search, groupID, privacyMode)
+	var accounts []service.Account
+	var err error
+	if listing, ok := h.adminService.(service.AccountDriverListingService); ok {
+		accounts, err = listing.ListAccountsForSchedulerScoreFilterWithDriver(ctx, service.PlatformOpenAI, accountType, status, search, groupID, privacyMode, driverID)
+	} else {
+		accounts, err = h.adminService.ListAccountsForSchedulerScoreFilter(ctx, service.PlatformOpenAI, accountType, status, search, groupID, privacyMode)
+	}
 	if err != nil {
 		slog.Warn("openai_scheduler_filter_score_pool_failed", "error", err)
 		return nil
@@ -641,6 +654,10 @@ func (h *AccountHandler) listAccountSchedulerScoreFilterPool(
 // List handles listing all accounts with pagination
 // GET /api/v1/admin/accounts
 func (h *AccountHandler) List(c *gin.Context) {
+	if err := service.ValidateAccountDriverFilter(c.Query("account_driver_id")); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 	page, pageSize := response.ParsePagination(c)
 	platform := c.Query("platform")
 	accountType := c.Query("type")
@@ -676,7 +693,7 @@ func (h *AccountHandler) List(c *gin.Context) {
 		}
 	}
 
-	accounts, total, err := h.adminService.ListAccounts(c.Request.Context(), page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
+	accounts, total, err := h.listAccountsWithDriver(c.Request.Context(), page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder, c.Query("account_driver_id"))
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -721,7 +738,7 @@ func (h *AccountHandler) List(c *gin.Context) {
 		}
 	}
 	if includeSchedulerScore && pageHasOpenAIAccounts {
-		schedulerFilterPool := h.listAccountSchedulerScoreFilterPool(c.Request.Context(), platform, accountType, status, search, groupID, privacyMode)
+		schedulerFilterPool := h.listAccountSchedulerScoreFilterPool(c.Request.Context(), platform, accountType, status, search, groupID, privacyMode, c.Query("account_driver_id"))
 		schedulerScores, schedulerGroupScores = h.buildOpenAIAccountSchedulerScores(c.Request.Context(), accounts, schedulerFilterPool)
 	}
 
@@ -1019,6 +1036,18 @@ func (h *AccountHandler) Create(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
+	if err := service.ValidateAccountDriverSelection(req.AccountDriverID, req.DriverSettings); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if err := service.ValidateAccountDriverForAccount(req.AccountDriverID, req.Platform, req.Type, req.Credentials); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if err := service.ValidateAccountDriverState(&service.Account{AccountDriverID: req.AccountDriverID, Platform: req.Platform, Type: req.Type, Credentials: req.Credentials, Extra: req.Extra}); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 	if err := service.ValidateOpenAILongContextBillingExtra(req.Platform, req.Extra); err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -1043,6 +1072,8 @@ func (h *AccountHandler) Create(c *gin.Context) {
 
 	result, err := executeAdminIdempotent(c, "admin.accounts.create", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
 		account, execErr := h.adminService.CreateAccount(ctx, &service.CreateAccountInput{
+			AccountDriverID:       req.AccountDriverID,
+			DriverSettings:        req.DriverSettings,
 			Name:                  req.Name,
 			Notes:                 req.Notes,
 			Platform:              req.Platform,
@@ -1160,6 +1191,14 @@ func (h *AccountHandler) Update(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
+	if err := service.ValidateAccountDriverFilter(req.AccountDriverID); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if len(req.DriverSettings) > 0 {
+		response.ErrorFrom(c, infraerrors.BadRequest("ACCOUNT_DRIVER_SETTINGS_UNSUPPORTED", "this account driver does not support driver settings"))
+		return
+	}
 	if req.RateMultiplier != nil && *req.RateMultiplier < 0 {
 		response.BadRequest(c, "rate_multiplier must be >= 0")
 		return
@@ -1175,6 +1214,8 @@ func (h *AccountHandler) Update(c *gin.Context) {
 	skipCheck := req.ConfirmMixedChannelRisk != nil && *req.ConfirmMixedChannelRisk
 
 	account, err := h.adminService.UpdateAccount(c.Request.Context(), accountID, &service.UpdateAccountInput{
+		AccountDriverID:       req.AccountDriverID,
+		DriverSettings:        req.DriverSettings,
 		Name:                  req.Name,
 		Notes:                 req.Notes,
 		Type:                  req.Type,
@@ -2307,6 +2348,12 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
+	if req.Filters != nil {
+		if err := service.ValidateAccountDriverFilter(req.Filters.AccountDriverID); err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+	}
 	if req.RateMultiplier != nil && *req.RateMultiplier < 0 {
 		response.BadRequest(c, "rate_multiplier must be >= 0")
 		return
@@ -2387,12 +2434,13 @@ func toServiceBulkUpdateAccountFilters(filters *BulkUpdateAccountFilters) *servi
 		return nil
 	}
 	return &service.BulkUpdateAccountFilters{
-		Platform:    filters.Platform,
-		Type:        filters.Type,
-		Status:      filters.Status,
-		Group:       filters.Group,
-		Search:      filters.Search,
-		PrivacyMode: filters.PrivacyMode,
+		AccountDriverID: filters.AccountDriverID,
+		Platform:        filters.Platform,
+		Type:            filters.Type,
+		Status:          filters.Status,
+		Group:           filters.Group,
+		Search:          filters.Search,
+		PrivacyMode:     filters.PrivacyMode,
 	}
 }
 

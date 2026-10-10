@@ -44,8 +44,8 @@ func ProvidePricingService(cfg *config.Config, remoteClient PricingRemoteClient)
 }
 
 // ProvideUpdateService creates UpdateService with BuildInfo
-func ProvideUpdateService(cache UpdateCache, githubClient GitHubReleaseClient, buildInfo BuildInfo) *UpdateService {
-	return NewUpdateService(cache, githubClient, buildInfo.Version, buildInfo.BuildType)
+func ProvideUpdateService(cache UpdateCache, githubClient GitHubReleaseClient, buildInfo BuildInfo, cfg *config.Config) *UpdateService {
+	return NewUpdateService(cache, githubClient, buildInfo.Version, buildInfo.BuildType, cfg.Update.GitHubRepo)
 }
 
 // ProvideEmailQueueService creates EmailQueueService with default worker count
@@ -93,8 +93,18 @@ func ProvideAuthService(
 }
 
 // ProvideOAuthRefreshAPI creates OAuthRefreshAPI with the default lock TTL.
-func ProvideOAuthRefreshAPI(accountRepo AccountRepository, tokenCache GeminiTokenCache) *OAuthRefreshAPI {
+func ProvideOAuthRefreshAPI(accountRepo AccountRepository, tokenCache GeminiTokenCache, _ *AccountDriverMaintenanceService) *OAuthRefreshAPI {
 	return NewOAuthRefreshAPI(accountRepo, tokenCache)
+}
+
+func ProvideAccountDriverMaintenanceService(accountRepo AccountRepository) (*AccountDriverMaintenanceService, error) {
+	maintenance := NewAccountDriverMaintenanceService(accountRepo)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := maintenance.Start(ctx); err != nil {
+		return nil, err
+	}
+	return maintenance, nil
 }
 
 func ProvideBatchImageModelPricingResolver(resolver *ModelPricingResolver) *BatchImageModelPricingResolver {
@@ -601,6 +611,15 @@ func ProvideAuditLogService(repo AuditLogRepository, settingService *SettingServ
 	return svc
 }
 
+// ProvideAPIRequestAuditService starts the bounded raw-payload audit writer.
+// The server bootstrap installs the returned service into the global HTTP
+// middleware and stops it with the other background services.
+func ProvideAPIRequestAuditService(repo APIRequestAuditRepository) *APIRequestAuditService {
+	svc := NewAPIRequestAuditService(repo, DefaultAPIRequestAuditConfig())
+	svc.Start()
+	return svc
+}
+
 func buildIdempotencyConfig(cfg *config.Config) IdempotencyConfig {
 	idempotencyCfg := DefaultIdempotencyConfig()
 	if cfg != nil {
@@ -916,6 +935,7 @@ var ProviderSet = wire.NewSet(
 	ProvideOpsService,
 	ProvideOpsIngressRejectAggregator,
 	ProvideAuditLogService,
+	ProvideAPIRequestAuditService,
 	ProvideOpsMetricsCollector,
 	ProvideOpsAggregationService,
 	ProvideOpsAlertEvaluatorService,
@@ -955,6 +975,7 @@ var ProviderSet = wire.NewSet(
 	NewErrorPassthroughService,
 	NewTLSFingerprintProfileService,
 	ProvidePluginManager,
+	ProvideAccountDriverMaintenanceService,
 	NewDigestSessionStore,
 	ProvideIdempotencyCoordinator,
 	ProvideSystemOperationLockService,

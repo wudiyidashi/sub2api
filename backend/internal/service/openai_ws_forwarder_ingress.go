@@ -71,6 +71,11 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 	firstClientMessage []byte,
 	hooks *OpenAIWSIngressHooks,
 ) (returnErr error) {
+	ctx, hooks, maintenanceCleanup, maintenanceErr := wrapAccountDriverMaintenanceWSHooks(ctx, account, hooks)
+	if maintenanceErr != nil {
+		return maintenanceErr
+	}
+	defer maintenanceCleanup()
 	if s == nil {
 		return errors.New("service is nil")
 	}
@@ -92,6 +97,15 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 	if err := validateOpenAIWSBearerToken(account, token); err != nil {
 		return err
 	}
+	// The HTTP upgrade itself has no body. Capture the first client frame here
+	// before any policy/model/account metadata rewrites so content audit keeps
+	// the exact payload the caller sent.
+	var clientAuditHeaders http.Header
+	if c.Request != nil {
+		clientAuditHeaders = c.Request.Header
+	}
+	auditTurnStart := MarkAPIRequestAuditTurn(ctx)
+	captureAPIRequestAuditFrame(ctx, APIRequestAuditDirectionClientRequest, firstClientMessage, clientAuditHeaders)
 
 	// 预取一次 OpenAI Fast Policy settings，绑定到 ctx，让该 WS session
 	// 内所有帧的 evaluateOpenAIFastPolicy 调用复用同一份快照，避免每帧
@@ -116,7 +130,8 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 
 	wsDecision := s.getOpenAIWSProtocolResolver().Resolve(account)
 	forceHTTPBridge := account.Platform == PlatformGrok ||
-		(s.pluginManager != nil && s.pluginManager.ShouldRouteOpenAIOAuth(account))
+		(usesCodexHTTPDriver(account) && wsDecision.Transport != OpenAIUpstreamTransportResponsesWebsocketV2) ||
+		(!usesCodexHTTPDriver(account) && s.pluginManager != nil && s.pluginManager.ShouldRouteOpenAIOAuth(account))
 	modeRouterV2Enabled := s != nil && s.cfg != nil && s.cfg.Gateway.OpenAIWS.ModeRouterV2Enabled
 	ingressMode := OpenAIWSIngressModeCtxPool
 	if modeRouterV2Enabled && !forceHTTPBridge {
@@ -487,10 +502,12 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		writeCtx, cancel := newOpenAIWSDownstreamWriteContext(ctx, hooks, s.openAIWSWriteTimeout())
 		defer cancel()
 		message = restoreCodexToolNamesFromContext(c, message)
+		captureAPIRequestAuditFrame(ctx, APIRequestAuditDirectionClientResponse, message, clientAuditHeaders)
 		return clientConn.Write(writeCtx, coderws.MessageText, message)
 	}
 
 	readClientMessage := func() ([]byte, error) {
+		auditTurnStart = MarkAPIRequestAuditTurn(ctx)
 		idleTimeout := s.openAIWSIngressInterTurnIdleTimeout()
 		msgType, payload, readErr := ReadOpenAIWSClientMessage(
 			ctx,
@@ -513,6 +530,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 				nil,
 			)
 		}
+		captureAPIRequestAuditFrame(ctx, APIRequestAuditDirectionClientRequest, payload, clientAuditHeaders)
 		return payload, nil
 	}
 
@@ -522,6 +540,11 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 	}
 
 	useHTTPBridge := forceHTTPBridge || s.shouldBridgeOpenAIWSHTTP(account, firstPayload.payloadBytes, firstPayload.previousResponseID)
+	if useHTTPBridge {
+		if err := s.managedWSHTTPContinuationError(account, firstPayload.previousResponseID); err != nil {
+			return err
+		}
+	}
 	turnState := strings.TrimSpace(c.GetHeader(openAIWSTurnStateHeader))
 	stateStore := s.getOpenAIWSStateStore()
 	groupID := getOpenAIGroupIDFromContext(c)
@@ -789,9 +812,12 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		return fmt.Errorf("build ws headers: %w", buildHdrErr)
 	}
 	baseAcquireReq := openAIWSAcquireRequest{
-		Account: account,
-		WSURL:   wsURL,
-		Headers: wsHeaders,
+		ManagedScope:                 managedAccountWSScope(c, firstClientMessage, sessionHash),
+		ManagedGeneration:            AccountDriverRuntimeGeneration(),
+		ManagedGenerationCanContinue: s.accountDriverGenerationCanContinue(),
+		Account:                      account,
+		WSURL:                        wsURL,
+		Headers:                      wsHeaders,
 		HeadersFactory: func(factoryCtx context.Context, headers http.Header) (http.Header, error) {
 			return s.refreshOpenAIAgentIdentityHeaders(factoryCtx, account, headers)
 		},
@@ -863,7 +889,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 	acquireTurnLease = func(turn int, preferred string, forcePreferredConn bool, forceNewConn bool) (*openAIWSConnLease, error) {
 		req := cloneOpenAIWSAcquireRequest(baseAcquireReq)
 		req.PreferredConnID = strings.TrimSpace(preferred)
-		req.ForcePreferredConn = forcePreferredConn
+		req.ForcePreferredConn = forcePreferredConn || (usesCodexHTTPDriver(account) && preferred != "")
 		// dedicated 模式下每次获取均新建连接，避免跨会话复用残留上下文；
 		// 上游读写失败后的重试同样新建，避免再拿到同批陈旧的空闲连接。
 		req.ForceNewConn = dedicatedMode || forceNewConn
@@ -970,6 +996,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 				false,
 			)
 		}
+		captureAPIRequestAuditFrame(ctx, APIRequestAuditDirectionUpstreamRequest, payload, lease.HandshakeHeaders())
 		if debugEnabled {
 			logOpenAIWSModeDebug(
 				"ingress_ws_turn_request_sent account_id=%d turn=%d conn_id=%s payload_bytes=%d",
@@ -1020,6 +1047,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 					wroteDownstream,
 				)
 			}
+			captureAPIRequestAuditFrame(ctx, APIRequestAuditDirectionUpstreamResponse, upstreamMessage, lease.HandshakeHeaders())
 			if normalized, changed := normalizeCompletedImageGenerationStatus(upstreamMessage); changed {
 				upstreamMessage = normalized
 			}
@@ -1028,6 +1056,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			responseModelObserver.ObserveOpenAI(upstreamMessage, eventType)
 			if responseID == "" && eventResponseID != "" {
 				responseID = eventResponseID
+				AliasAPIRequestAuditTurn(ctx, auditTurnStart, responseID)
 			}
 			if eventType != "" {
 				eventCount++
@@ -1436,6 +1465,9 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		return true
 	}
 	retryIngressTurn := func(relayErr error, turn int, connID string) bool {
+		if managedWSMayHaveBeenSent(relayErr) {
+			return false
+		}
 		if !isOpenAIWSIngressTurnRetryable(relayErr) || turnRetry >= 1 {
 			return false
 		}

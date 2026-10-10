@@ -30,6 +30,10 @@ type upstreamBillingRatesResponse struct {
 //
 // GET /api/v1/admin/accounts/upstream-billing-rates
 func (h *AccountHandler) GetUpstreamBillingRates(c *gin.Context) {
+	if err := service.ValidateAccountDriverFilter(c.Query("account_driver_id")); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 	if h.adminService == nil {
 		response.Error(c, http.StatusServiceUnavailable, "account service unavailable")
 		return
@@ -61,9 +65,9 @@ func (h *AccountHandler) GetUpstreamBillingRates(c *gin.Context) {
 		}
 	}
 
-	accounts, total, err := h.adminService.ListAccounts(
+	accounts, total, err := h.listAccountsWithDriver(
 		c.Request.Context(), page, pageSize, platform, accountType, status,
-		search, groupID, privacyMode, sortBy, sortOrder,
+		search, groupID, privacyMode, sortBy, sortOrder, c.Query("account_driver_id"),
 	)
 	if err != nil {
 		response.ErrorFrom(c, err)

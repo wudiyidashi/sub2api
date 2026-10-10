@@ -299,6 +299,7 @@ func (s *adminServiceImpl) DuplicateAccount(ctx context.Context, id int64, actor
 		proxyID = source.ProxyFallbackOriginID
 	}
 	input := &CreateAccountInput{
+		AccountDriverID:       source.EffectiveAccountDriverID(),
 		Name:                  duplicateAccountName(source.Name),
 		Notes:                 cloneAccountValuePointer(source.Notes),
 		Platform:              source.Platform,
@@ -411,6 +412,9 @@ func normalizeOpenAILongContextBillingUpdateExtra(account *Account, input *Updat
 // Grok media eligibility helpers live in account_grok_media_eligibility.go.
 
 func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]any) (*Account, error) {
+	if err := ValidateAccountDriverForAccount(input.AccountDriverID, input.Platform, input.Type, input.Credentials); err != nil {
+		return nil, err
+	}
 	if input.Platform == PlatformTypeSafe && input.Type != AccountTypeAPIKey {
 		return nil, errors.New("typesafe accounts only support apikey credentials")
 	}
@@ -425,17 +429,26 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 	delete(accountExtra, OpenCodeGoUsageSnapshotExtraKey)
 	accountExtra = prepareCodexFingerprintExtraForCreate(input.Platform, input.Type, accountExtra)
 	account := &Account{
-		Name:        input.Name,
-		Notes:       normalizeAccountNotes(input.Notes),
-		Platform:    input.Platform,
-		Type:        input.Type,
-		Credentials: input.Credentials,
-		Extra:       accountExtra,
-		ProxyID:     input.ProxyID,
-		Concurrency: normalizeAccountConcurrency(input.Platform, input.Type, input.Concurrency),
-		Priority:    input.Priority,
-		Status:      StatusActive,
-		Schedulable: true,
+		AccountDriverID:       strings.TrimSpace(input.AccountDriverID),
+		AccountDriverRevision: 1,
+		Name:                  input.Name,
+		Notes:                 normalizeAccountNotes(input.Notes),
+		Platform:              input.Platform,
+		Type:                  input.Type,
+		Credentials:           input.Credentials,
+		Extra:                 accountExtra,
+		ProxyID:               input.ProxyID,
+		Concurrency:           normalizeAccountConcurrency(input.Platform, input.Type, input.Concurrency),
+		Priority:              input.Priority,
+		Status:                StatusActive,
+		Schedulable:           true,
+	}
+	account.AccountDriverID = account.EffectiveAccountDriverID()
+	if err := validateAccountDriverWSConfigChange(&Account{AccountDriverID: account.AccountDriverID}, account.Extra); err != nil {
+		return nil, err
+	}
+	if err := ValidateAccountDriverState(account); err != nil {
+		return nil, err
 	}
 	if input.ProbeEnabled != nil && *input.ProbeEnabled {
 		if !isUpstreamBillingProbeAccount(account) {
@@ -479,6 +492,12 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 }
 
 func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccountInput) (*Account, error) {
+	if err := ValidateAccountDriverSelection(input.AccountDriverID, input.DriverSettings); err != nil {
+		return nil, err
+	}
+	if err := ValidateAccountDriverForAccount(input.AccountDriverID, input.Platform, input.Type, input.Credentials); err != nil {
+		return nil, err
+	}
 	accountExtra, err := normalizeOpenAILongContextBillingExtra(input.Platform, input.Extra)
 	if err != nil {
 		return nil, err
@@ -575,9 +594,46 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 }
 
 func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *UpdateAccountInput) (*Account, error) {
+	ctx, releaseOperation, operationErr := AcquireAccountDriverOperation(ctx, id, "edit")
+	if operationErr != nil {
+		return nil, operationErr
+	}
+	defer releaseOperation()
+	// A same-driver selection is idempotent. Switching implementations requires
+	// a future maintenance operation, not an ordinary credentials update.
+	if err := ValidateAccountDriverFilter(input.AccountDriverID); err != nil {
+		return nil, err
+	}
+	if len(input.DriverSettings) > 0 {
+		return nil, infraerrors.BadRequest("ACCOUNT_DRIVER_SETTINGS_UNSUPPORTED", "this account driver does not support driver settings")
+	}
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+	if err := ValidateAccountDriverUpdate(account, input.AccountDriverID, input.DriverSettings); err != nil {
+		return nil, err
+	}
+	if err := validateAccountDriverWSConfigChange(account, input.Extra); err != nil {
+		return nil, err
+	}
+	effectiveDriverType := account.Type
+	if input.Type != "" {
+		effectiveDriverType = input.Type
+	}
+	effectiveDriverCredentials := account.Credentials
+	if len(input.Credentials) > 0 {
+		effectiveDriverCredentials = MergePreservingSensitiveCreds(account.Credentials, input.Credentials)
+	}
+	if input.Type != "" || len(input.Credentials) > 0 || input.Extra != nil {
+		candidate := *account
+		candidate.Type, candidate.Credentials = effectiveDriverType, effectiveDriverCredentials
+		if input.Extra != nil {
+			candidate.Extra = input.Extra
+		}
+		if err := ValidateAccountDriverState(&candidate); err != nil {
+			return nil, err
+		}
 	}
 	if account.Platform == PlatformTypeSafe && input.Type != "" && input.Type != AccountTypeAPIKey {
 		return nil, errors.New("typesafe accounts only support apikey credentials")
@@ -926,6 +982,11 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 // UpdateAccountExtra 仅对 Extra JSONB 做 key 级合并，避免覆盖其它运行态键
 // （如 model_rate_limits / passive_usage_* 等）。
 func (s *adminServiceImpl) UpdateAccountExtra(ctx context.Context, id int64, updates map[string]any) error {
+	ctx, releaseOperation, operationErr := AcquireAccountDriverOperation(ctx, id, "edit")
+	if operationErr != nil {
+		return operationErr
+	}
+	defer releaseOperation()
 	updates = sanitizedCodexFingerprintExtraUpdates(updates)
 	updates = stripOpenAIAutoResetCreditManagedExtra(updates, true)
 	delete(updates, UpstreamBillingProbeEnabledExtraKey)
@@ -954,6 +1015,11 @@ func (s *adminServiceImpl) UpdateAccountExtra(ctx context.Context, id int64, upd
 // BulkUpdateAccounts updates multiple accounts in one request.
 // It merges credentials/extra keys instead of overwriting the whole object.
 func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUpdateAccountsInput) (*BulkUpdateAccountsResult, error) {
+	if input.Filters != nil {
+		if err := ValidateAccountDriverFilter(input.Filters.AccountDriverID); err != nil {
+			return nil, err
+		}
+	}
 	// Managed probe/session state may only enter through dedicated typed endpoints.
 	input.Extra = sanitizedCodexFingerprintExtraUpdates(input.Extra)
 	input.Extra = stripOpenAIAutoResetCreditManagedExtra(input.Extra, true)
@@ -983,6 +1049,13 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	if len(input.AccountIDs) == 0 {
 		return result, nil
 	}
+	for _, accountID := range input.AccountIDs {
+		_, release, err := AcquireAccountDriverOperation(ctx, accountID, "bulk_edit")
+		if err != nil {
+			return nil, err
+		}
+		defer release()
+	}
 	if input.GroupIDs != nil {
 		if err := s.validateGroupIDsExist(ctx, *input.GroupIDs); err != nil {
 			return nil, err
@@ -1000,7 +1073,7 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 
 	// 预取所有目标账号，供凭据守卫/代理守卫/混合渠道检查共用，避免多次 DB 查询。
 	var cachedTargets []*Account
-	if len(input.Credentials) > 0 || input.ProxyID != nil || needMixedChannelCheck || openAISettings.any() || input.ProbeEnabled != nil || input.RateMultiplier != nil {
+	if len(input.Credentials) > 0 || len(input.Extra) > 0 || input.ProxyID != nil || needMixedChannelCheck || openAISettings.any() || input.ProbeEnabled != nil || input.RateMultiplier != nil {
 		loaded, err := s.accountRepo.GetByIDs(ctx, input.AccountIDs)
 		if err != nil {
 			return nil, err
@@ -1011,6 +1084,34 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	for _, account := range cachedTargets {
 		if account != nil {
 			targetsByID[account.ID] = account
+		}
+	}
+	if len(input.Credentials) > 0 || len(input.Extra) > 0 {
+		// Validate the final merged state of every target before the first bulk
+		// mutation. Mixed native/enhanced selections must never partially apply.
+		for _, account := range cachedTargets {
+			if account == nil {
+				continue
+			}
+			if err := validateAccountDriverWSConfigChange(account, input.Extra); err != nil {
+				return nil, err
+			}
+			candidate := *account
+			if len(input.Credentials) > 0 {
+				candidate.Credentials = MergePreservingSensitiveCreds(account.Credentials, input.Credentials)
+			}
+			if len(input.Extra) > 0 {
+				candidate.Extra = shallowCopyMap(account.Extra)
+				if candidate.Extra == nil {
+					candidate.Extra = make(map[string]any)
+				}
+				for key, value := range input.Extra {
+					candidate.Extra[key] = value
+				}
+			}
+			if err := ValidateAccountDriverState(&candidate); err != nil {
+				return nil, err
+			}
 		}
 	}
 	if openAISettings.any() {
@@ -1237,6 +1338,9 @@ func (s *adminServiceImpl) resolveBulkUpdateTargetIDs(ctx context.Context, filte
 	if filters == nil {
 		return nil, nil
 	}
+	if err := ValidateAccountDriverFilter(filters.AccountDriverID); err != nil {
+		return nil, err
+	}
 
 	groupID := int64(0)
 	switch strings.TrimSpace(filters.Group) {
@@ -1256,7 +1360,7 @@ func (s *adminServiceImpl) resolveBulkUpdateTargetIDs(ctx context.Context, filte
 	accountIDs := make([]int64, 0, pageSize)
 
 	for {
-		accounts, total, err := s.ListAccounts(
+		accounts, total, err := s.ListAccountsWithDriver(
 			ctx,
 			page,
 			pageSize,
@@ -1268,6 +1372,7 @@ func (s *adminServiceImpl) resolveBulkUpdateTargetIDs(ctx context.Context, filte
 			filters.PrivacyMode,
 			"",
 			"",
+			filters.AccountDriverID,
 		)
 		if err != nil {
 			return nil, err
@@ -1283,6 +1388,11 @@ func (s *adminServiceImpl) resolveBulkUpdateTargetIDs(ctx context.Context, filte
 }
 
 func (s *adminServiceImpl) DeleteAccount(ctx context.Context, id int64) error {
+	ctx, releaseOperation, operationErr := AcquireAccountDriverOperation(ctx, id, "delete")
+	if operationErr != nil {
+		return operationErr
+	}
+	defer releaseOperation()
 	// 级联删除 spark 影子账号（先删影子，再删母账号）
 	shadows, err := s.accountRepo.ListShadowsByParent(ctx, id)
 	if err != nil {
@@ -1309,6 +1419,11 @@ func (s *adminServiceImpl) RefreshAccountCredentials(ctx context.Context, id int
 }
 
 func (s *adminServiceImpl) ClearAccountError(ctx context.Context, id int64) (*Account, error) {
+	ctx, releaseOperation, operationErr := AcquireAccountDriverOperation(ctx, id, "maintenance")
+	if operationErr != nil {
+		return nil, operationErr
+	}
+	defer releaseOperation()
 	if err := s.accountRepo.ClearError(ctx, id); err != nil {
 		return nil, err
 	}
@@ -1331,10 +1446,20 @@ func (s *adminServiceImpl) ClearAccountError(ctx context.Context, id int64) (*Ac
 }
 
 func (s *adminServiceImpl) SetAccountError(ctx context.Context, id int64, errorMsg string) error {
+	ctx, releaseOperation, operationErr := AcquireAccountDriverOperation(ctx, id, "maintenance")
+	if operationErr != nil {
+		return operationErr
+	}
+	defer releaseOperation()
 	return s.accountRepo.SetError(ctx, id, errorMsg)
 }
 
 func (s *adminServiceImpl) SetAccountSchedulable(ctx context.Context, id int64, schedulable bool) (*Account, error) {
+	ctx, releaseOperation, operationErr := AcquireAccountDriverOperation(ctx, id, "maintenance")
+	if operationErr != nil {
+		return nil, operationErr
+	}
+	defer releaseOperation()
 	if err := s.accountRepo.SetSchedulable(ctx, id, schedulable); err != nil {
 		return nil, err
 	}
@@ -1346,6 +1471,11 @@ func (s *adminServiceImpl) SetAccountSchedulable(ctx context.Context, id int64, 
 }
 
 func (s *adminServiceImpl) RevertAccountProxyFallback(ctx context.Context, id int64) error {
+	ctx, releaseOperation, operationErr := AcquireAccountDriverOperation(ctx, id, "edit")
+	if operationErr != nil {
+		return operationErr
+	}
+	defer releaseOperation()
 	if err := s.accountRepo.RevertProxyFallback(ctx, id); err != nil {
 		return err
 	}
@@ -1360,10 +1490,18 @@ func (s *adminServiceImpl) RevertAccountProxyFallback(ctx context.Context, id in
 // CreateShadow 为指定 OpenAI OAuth 母账号创建 spark 维度影子账号（一母一影）。
 // 安全不变量：Credentials 恒不含 auth token（仅 model_mapping，守卫 isAllowedSparkShadowCredentialsUpdate 放行）。
 func (s *adminServiceImpl) CreateShadow(ctx context.Context, parentID int64, opts ShadowOptions) (*Account, error) {
+	ctx, releaseOperation, operationErr := AcquireAccountDriverOperation(ctx, parentID, "edit")
+	if operationErr != nil {
+		return nil, operationErr
+	}
+	defer releaseOperation()
 	// 1. 加载母账号并校验平台/类型
 	parent, err := s.accountRepo.GetByID(ctx, parentID)
 	if err != nil {
 		return nil, fmt.Errorf("get parent account: %w", err)
+	}
+	if parent.EffectiveAccountDriverID() != "native" {
+		return nil, infraerrors.BadRequest("ACCOUNT_DRIVER_AUTH_MODE_UNSUPPORTED", "this account driver does not support spark credential shadows")
 	}
 	if !parent.IsOpenAIOAuth() {
 		return nil, infraerrors.New(http.StatusBadRequest, "SPARK_SHADOW_INVALID_PARENT",
@@ -1645,6 +1783,11 @@ func (e *MixedChannelError) Error() string {
 }
 
 func (s *adminServiceImpl) ResetAccountQuota(ctx context.Context, id int64) error {
+	ctx, releaseOperation, operationErr := AcquireAccountDriverOperation(ctx, id, "maintenance")
+	if operationErr != nil {
+		return operationErr
+	}
+	defer releaseOperation()
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return err
@@ -1661,6 +1804,16 @@ func (s *adminServiceImpl) ResetAccountQuota(ctx context.Context, id int64) erro
 // EnsureOpenAIPrivacy 检查 OpenAI OAuth 账号是否已设置 privacy_mode，
 // 未设置则调用 disableOpenAITraining 并持久化到 Extra，返回设置的 mode 值。
 func (s *adminServiceImpl) EnsureOpenAIPrivacy(ctx context.Context, account *Account) string {
+	if account == nil {
+		return ""
+	}
+	var release func()
+	var operationErr error
+	ctx, release, operationErr = AcquireAccountDriverOperation(ctx, account.ID, "maintenance")
+	if operationErr != nil {
+		return ""
+	}
+	defer release()
 	// 影子账号不持凭据，隐私设置由母账号管理，直接跳过。
 	if account.IsCredentialShadow() {
 		return ""
@@ -1698,6 +1851,16 @@ func (s *adminServiceImpl) EnsureOpenAIPrivacy(ctx context.Context, account *Acc
 
 // ForceOpenAIPrivacy 强制重新设置 OpenAI OAuth 账号隐私，无论当前状态。
 func (s *adminServiceImpl) ForceOpenAIPrivacy(ctx context.Context, account *Account) string {
+	if account == nil {
+		return ""
+	}
+	var release func()
+	var operationErr error
+	ctx, release, operationErr = AcquireAccountDriverOperation(ctx, account.ID, "maintenance")
+	if operationErr != nil {
+		return ""
+	}
+	defer release()
 	// 影子账号不持凭据,隐私由母账号管理,直接跳过(与 EnsureOpenAIPrivacy 一致——外审第4轮)。
 	if account.IsCredentialShadow() {
 		return ""
@@ -1741,6 +1904,16 @@ func (s *adminServiceImpl) ForceOpenAIPrivacy(ctx context.Context, account *Acco
 // 仅当 privacy_mode 已成功设置（"privacy_set"）时跳过；
 // 未设置或之前失败（"privacy_set_failed"）均会重试。
 func (s *adminServiceImpl) EnsureAntigravityPrivacy(ctx context.Context, account *Account) string {
+	if account == nil {
+		return ""
+	}
+	var release func()
+	var operationErr error
+	ctx, release, operationErr = AcquireAccountDriverOperation(ctx, account.ID, "maintenance")
+	if operationErr != nil {
+		return ""
+	}
+	defer release()
 	if account.Platform != PlatformAntigravity || account.Type != AccountTypeOAuth {
 		return ""
 	}
@@ -1779,6 +1952,16 @@ func (s *adminServiceImpl) EnsureAntigravityPrivacy(ctx context.Context, account
 
 // ForceAntigravityPrivacy 强制重新设置 Antigravity OAuth 账号隐私，无论当前状态。
 func (s *adminServiceImpl) ForceAntigravityPrivacy(ctx context.Context, account *Account) string {
+	if account == nil {
+		return ""
+	}
+	var release func()
+	var operationErr error
+	ctx, release, operationErr = AcquireAccountDriverOperation(ctx, account.ID, "maintenance")
+	if operationErr != nil {
+		return ""
+	}
+	defer release()
 	if account.Platform != PlatformAntigravity || account.Type != AccountTypeOAuth {
 		return ""
 	}

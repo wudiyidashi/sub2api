@@ -6,6 +6,7 @@
     @close="handleClose"
   >
     <div v-if="account" class="space-y-4">
+      <p v-if="maintenanceBlocked" class="text-sm text-amber-600 dark:text-amber-400" role="status">{{ t('admin.accounts.accountDriver.maintenance.blockedHint') }}</p>
       <!-- Account Info -->
       <div
         class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-dark-600 dark:bg-dark-700"
@@ -120,6 +121,7 @@
         </div>
       </div>
 
+      <fieldset :disabled="maintenanceBlocked">
       <OAuthAuthorizationFlow
         ref="oauthFlowRef"
         :add-method="addMethod"
@@ -143,6 +145,7 @@
         @validate-refresh-token="handleValidateRefreshToken"
         @import-sso="handleGrokImportSSO"
       />
+      </fieldset>
 
     </div>
 
@@ -154,7 +157,7 @@
         <button
           v-if="isManualInputMethod"
           type="button"
-          :disabled="!canExchangeCode"
+          :disabled="!canExchangeCode || maintenanceBlocked"
           class="btn btn-primary"
           @click="handleExchangeCode"
         >
@@ -222,6 +225,7 @@ interface OAuthFlowExposed {
 interface Props {
   show: boolean
   account: Account | null
+  maintenanceBlocked?: boolean
 }
 
 const props = defineProps<Props>()
@@ -367,7 +371,7 @@ const handleClose = () => {
 }
 
 const handleGenerateUrl = async () => {
-  if (!props.account) return
+  if (!props.account || props.maintenanceBlocked) return
 
   if (isOpenAILike.value) {
     await openaiOAuth.generateAuthUrl(props.account.proxy_id)
@@ -386,7 +390,7 @@ const handleGenerateUrl = async () => {
 }
 
 const handleExchangeCode = async () => {
-  if (!props.account) return
+  if (!props.account || props.maintenanceBlocked) return
 
   const authCode = oauthFlowRef.value?.authCode || ''
   if (!authCode.trim()) return
@@ -569,7 +573,7 @@ const handleExchangeCode = async () => {
 }
 
 const handleCookieAuth = async (sessionKey: string) => {
-  if (!props.account || isOpenAILike.value) return
+  if (!props.account || props.maintenanceBlocked || isOpenAILike.value) return
 
   claudeOAuth.loading.value = true
   claudeOAuth.error.value = ''
@@ -628,7 +632,7 @@ const applyGrokReauthTokenInfo = async (tokenInfo: {
 
 /** Re-auth the existing account with one refresh token. */
 const handleValidateRefreshToken = async (refreshTokenInput: string) => {
-  if (!props.account) return
+  if (!props.account || props.maintenanceBlocked) return
   if (isGrok.value) {
     await handleGrokValidateRefreshToken(refreshTokenInput)
     return
@@ -696,7 +700,7 @@ const handleValidateRefreshToken = async (refreshTokenInput: string) => {
 
 /** Re-auth with a single SSO cookie → Build OAuth (not batch create). */
 const handleGrokImportSSO = async (ssoInput: string) => {
-  if (!props.account || !isGrok.value) return
+  if (!props.account || props.maintenanceBlocked || !isGrok.value) return
   const ssoToken = ssoInput
     .split('\n')
     .map((line) => line.trim())
@@ -722,7 +726,7 @@ const handleGrokImportSSO = async (ssoInput: string) => {
 
 /** Re-auth with a single refresh token. */
 const handleGrokValidateRefreshToken = async (refreshTokenInput: string) => {
-  if (!props.account || !isGrok.value) return
+  if (!props.account || props.maintenanceBlocked || !isGrok.value) return
   const refreshToken = refreshTokenInput
     .split('\n')
     .map((line) => line.trim())

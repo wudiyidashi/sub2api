@@ -420,7 +420,9 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 	grokCacheIdentity string,
 	turn int,
 	writeClientMessage func([]byte) error,
-) (*OpenAIForwardResult, error) {
+) (forwardResult *OpenAIForwardResult, forwardErr error) {
+	ctx, driverTracker := withAccountDriverAttemptTracking(ctx, payload)
+	defer func() { forwardErr = restrictAccountDriverFailover(account, driverTracker, forwardErr) }()
 	if s == nil {
 		return nil, errors.New("service is nil")
 	}

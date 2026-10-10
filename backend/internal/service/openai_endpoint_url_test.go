@@ -14,6 +14,7 @@ func TestBuildOpenAIEndpointURLPreservesURLComponents(t *testing.T) {
 		want     string
 	}{
 		{name: "root", base: "https://upstream.example", endpoint: "/v1/models", want: "https://upstream.example/v1/models"},
+		{name: "codex bridge", base: "http://codex-proxy-rs:8080", endpoint: "/v1/responses", want: "http://codex-proxy-rs:8080/v1/responses"},
 		{name: "v1", base: "https://upstream.example/v1", endpoint: "/v1/responses", want: "https://upstream.example/v1/responses"},
 		{name: "prefix", base: "https://upstream.example/openai", endpoint: "/v1/chat/completions", want: "https://upstream.example/openai/v1/chat/completions"},
 		{name: "version", base: "https://upstream.example/openai/v2", endpoint: "/v1/embeddings", want: "https://upstream.example/openai/v2/embeddings"},

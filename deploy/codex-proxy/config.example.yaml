@@ -1,0 +1,54 @@
+# Copy this file to deploy/codex-proxy/config.yaml before enabling
+# docker-compose.codex.yml. Keep the copied file private.
+
+schema_version: 1
+
+host:
+  listen:
+    host: '127.0.0.1'
+    port: 8080
+  runtime_data_dir: '/app/.runtime/data'
+  logging:
+    level: 'info'
+    stdout: true
+    oauth_recovery: false
+    request_dump: false
+    request_dump_retention_days: 1
+    file:
+      enabled: true
+      directory: '/app/.runtime/logs'
+      retention_days: 7
+      max_file_size_mb: 20
+  drain_timeout_seconds: 30
+  worker_shutdown_timeout_seconds: 30
+
+store:
+  database:
+    # CPR_DATABASE_URL and CPR_DATABASE_PASSWORD are supplied by Compose.
+    url: 'postgres://codex_proxy@codex-proxy-postgres:5432/codex_proxy'
+    password: ''
+  redis:
+    # CPR_REDIS_URL and CPR_REDIS_PASSWORD are supplied by Compose.
+    url: 'redis://codex-proxy-redis:6379/'
+    password: ''
+
+admin:
+  session_ttl_minutes: 1440
+  default_username: 'admin@cpr.local'
+  # Set this before the first bridge startup. Use at least 12 characters.
+  default_password: 'CHANGE_THIS_CODEX_BRIDGE_PASSWORD'
+
+client:
+  session_ttl_minutes: 1440
+
+api:
+  asset_directory: '/app/web/dist'
+  cors_allowed_origins: []
+  request_timeout_seconds: null
+  request_id_header: 'x-request-id'
+
+openai:
+  # Optional residency hint for Codex upstream requests.
+  residency: us
+
+services: {}

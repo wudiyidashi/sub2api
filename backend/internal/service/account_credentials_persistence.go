@@ -22,7 +22,18 @@ func persistAccountCredentials(ctx context.Context, repo AccountRepository, acco
 			"account_id", account.ID, "parent_id", *account.ParentAccountID)
 		return nil
 	}
+	operationCtx, release, admissionErr := AcquireAccountDriverBoundOperation(ctx, account, "credentials")
+	if admissionErr != nil {
+		return admissionErr
+	}
+	defer release()
+	ctx = operationCtx
 
+	candidate := *account
+	candidate.Credentials = credentials
+	if err := ValidateAccountDriverState(&candidate); err != nil {
+		return err
+	}
 	account.Credentials = shallowCopyMap(credentials)
 	if updater, ok := any(repo).(accountCredentialsUpdater); ok {
 		return updater.UpdateCredentials(ctx, account.ID, account.Credentials)

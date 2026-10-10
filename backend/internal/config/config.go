@@ -3,6 +3,7 @@ package config
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"log/slog"
@@ -106,6 +107,7 @@ type Config struct {
 	BatchImage              BatchImageConfig              `mapstructure:"batch_image"`
 	ImageStorage            ImageStorageConfig            `mapstructure:"image_storage"`
 	Plugins                 PluginConfig                  `mapstructure:"plugins"`
+	AccountDrivers          AccountDriversConfig          `mapstructure:"account_drivers"`
 
 	// Enforce only API-key spending windows in simple mode.
 	SimpleModeKeyRateLimitEnabled bool `mapstructure:"simple_mode_key_rate_limit_enabled" yaml:"simple_mode_key_rate_limit_enabled"`
@@ -125,6 +127,18 @@ type PluginConfig struct {
 	MaxUploadBytes       int64             `mapstructure:"max_upload_bytes"`
 	MaxUncompressedBytes int64             `mapstructure:"max_uncompressed_bytes"`
 	StartTimeoutSeconds  int               `mapstructure:"start_timeout_seconds"`
+}
+
+// AccountDriversConfig enables explicitly selected managed account transports.
+type AccountDriversConfig struct {
+	CodexRSHTTP CodexRSHTTPDriverConfig `mapstructure:"codex_rs_http"`
+}
+
+type CodexRSHTTPDriverConfig struct {
+	Enabled             bool   `mapstructure:"enabled"`
+	ExecutablePath      string `mapstructure:"executable_path"`
+	SHA256              string `mapstructure:"sha256"`
+	StartTimeoutSeconds int    `mapstructure:"start_timeout_seconds"`
 }
 
 type LogConfig struct {
@@ -182,6 +196,8 @@ type GeminiTierQuotaConfig struct {
 }
 
 type UpdateConfig struct {
+	// GitHubRepo 是在线更新与版本检查使用的仓库，格式为 owner/repository。
+	GitHubRepo string `mapstructure:"github_repo"`
 	// ProxyURL 用于访问 GitHub 的代理地址
 	// 支持 http/https/socks5/socks5h 协议
 	// 例如: "http://127.0.0.1:7890", "socks5://127.0.0.1:1080"
@@ -2354,6 +2370,10 @@ func setDefaults() {
 	viper.SetDefault("plugins.max_upload_bytes", int64(128*1024*1024))
 	viper.SetDefault("plugins.max_uncompressed_bytes", int64(256*1024*1024))
 	viper.SetDefault("plugins.start_timeout_seconds", 15)
+	viper.SetDefault("account_drivers.codex_rs_http.enabled", false)
+	viper.SetDefault("account_drivers.codex_rs_http.executable_path", "")
+	viper.SetDefault("account_drivers.codex_rs_http.sha256", "")
+	viper.SetDefault("account_drivers.codex_rs_http.start_timeout_seconds", 10)
 
 	// Timezone (default to Asia/Shanghai for Chinese users)
 	viper.SetDefault("timezone", "Asia/Shanghai")
@@ -2642,6 +2662,7 @@ func setEnvReachableDefaults() {
 	viper.SetDefault("gateway.forced_codex_instructions_template_file", "")
 	viper.SetDefault("gateway.session_idle_timeout_minutes", 0)
 	viper.SetDefault("gateway.user_message_queue.mode", "")
+	viper.SetDefault("update.github_repo", "wudiyidashi/sub2api")
 	viper.SetDefault("update.proxy_url", "")
 
 	// sticky_escape_enabled is the one exception to the zero-value rule: its
@@ -2703,6 +2724,21 @@ func setEnvReachableDefaults() {
 }
 
 func (c *Config) Validate() error {
+	if c.AccountDrivers.CodexRSHTTP.Enabled {
+		driver := c.AccountDrivers.CodexRSHTTP
+		if strings.TrimSpace(driver.ExecutablePath) == "" {
+			return fmt.Errorf("account_drivers.codex_rs_http.executable_path is required when enabled")
+		}
+		if driver.StartTimeoutSeconds < 1 || driver.StartTimeoutSeconds > 120 {
+			return fmt.Errorf("account_drivers.codex_rs_http.start_timeout_seconds must be between 1 and 120")
+		}
+		if driver.SHA256 != "" {
+			checksum, err := hex.DecodeString(driver.SHA256)
+			if err != nil || len(checksum) != sha256.Size {
+				return fmt.Errorf("account_drivers.codex_rs_http.sha256 must be a hexadecimal SHA-256 digest")
+			}
+		}
+	}
 	forwardedClientIPHeaders, err := NormalizeForwardedClientIPHeaders(c.Security.ForwardedClientIPHeaders)
 	if err != nil {
 		return fmt.Errorf("security.forwarded_client_ip_headers: %w", err)

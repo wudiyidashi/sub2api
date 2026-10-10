@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/contentaudit"
 	"github.com/Wei-Shaw/sub2api/internal/handler/admin"
 	"github.com/Wei-Shaw/sub2api/internal/securityaudit"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -51,7 +52,14 @@ func ProvideAdminHandlers(
 	ollamaCloudUsage *service.OllamaCloudUsageService,
 	opencodeGoUsage *service.OpenCodeGoUsageService,
 	claudeResetCredits *service.ClaudeResetCreditService,
+	pluginManager *service.PluginManager,
+	accountDriverMaintenance *service.AccountDriverMaintenanceService,
+	openaiGateway *service.OpenAIGatewayService,
+	contentAudit *admin.ContentAuditHandler,
 ) *AdminHandlers {
+	accountDriverMaintenance.SetDrainHook(openaiGateway.DrainAccountDriverConnections)
+	accountHandler.SetAccountDriverRuntime(pluginManager.AccountDriverRuntime())
+	accountHandler.SetAccountDriverMaintenanceService(accountDriverMaintenance)
 	accountHandler.SetUpstreamBillingProbeService(upstreamBillingProbe)
 	accountHandler.SetOllamaCloudUsageService(ollamaCloudUsage)
 	accountHandler.SetOpenCodeGoUsageService(opencodeGoUsage)
@@ -89,11 +97,18 @@ func ProvideAdminHandlers(
 		ChannelMonitorTemplate: channelMonitorTemplateHandler,
 		ContentModeration:      contentModerationHandler,
 		PromptAudit:            promptAuditHandler,
+		ContentAudit:           contentAudit,
 		Payment:                paymentHandler,
 		Affiliate:              affiliateHandler,
 		Compliance:             complianceHandler,
 		AuditLog:               auditLogHandler,
 	}
+}
+
+func ProvideContentAuditHandler(ops *service.OpsService, prompt *securityaudit.PromptService, raw *service.APIRequestAuditService) *admin.ContentAuditHandler {
+	facade := contentaudit.NewFacade(ops, prompt)
+	facade.SetRawPayloadService(raw)
+	return admin.NewContentAuditHandler(facade)
 }
 
 func ProvideGatewayHandler(
@@ -289,6 +304,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewAffiliateHandler,
 	admin.NewComplianceHandler,
 	admin.NewAuditLogHandler,
+	ProvideContentAuditHandler,
 
 	// AdminHandlers and Handlers constructors
 	ProvideAdminHandlers,

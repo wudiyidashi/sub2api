@@ -59,7 +59,14 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 	promptCacheKey string,
 	defaultMappedModel string,
 ) (*OpenAIForwardResult, error) {
-	return s.forwardAsChatCompletions(ctx, c, account, body, promptCacheKey, defaultMappedModel, false)
+	ctx, releaseDriverOperation, admissionErr := acquireOpenAIAccountDriverOperation(ctx, account)
+	if admissionErr != nil {
+		return nil, admissionErr
+	}
+	defer releaseDriverOperation()
+	ctx, tracker := withAccountDriverAttemptTracking(ctx, body)
+	result, err := s.forwardAsChatCompletions(ctx, c, account, body, promptCacheKey, defaultMappedModel, false)
+	return result, restrictAccountDriverFailover(account, tracker, err)
 }
 
 func (s *OpenAIGatewayService) forwardAsChatCompletions(

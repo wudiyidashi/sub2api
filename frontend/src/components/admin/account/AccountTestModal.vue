@@ -6,6 +6,7 @@
     @close="handleClose"
   >
     <div class="space-y-4">
+      <p v-if="maintenanceBlocked" class="text-sm text-amber-600 dark:text-amber-400" role="status">{{ t('admin.accounts.accountDriver.maintenance.blockedHint') }}</p>
       <!-- Account Info Card -->
       <div
         v-if="account"
@@ -393,6 +394,7 @@ interface PreviewMedia {
 const props = defineProps<{
   show: boolean
   account: Account | null
+  maintenanceBlocked?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -674,6 +676,7 @@ const testModeSummary = computed(() => {
 })
 
 const canStartTest = computed(() => {
+  if (props.maintenanceBlocked) return false
   if (status.value === 'connecting') return false
   if (isGrokAccount.value) {
     if (
@@ -827,6 +830,7 @@ const scrollToBottom = async () => {
 
 const startTest = async () => {
   if (!props.account || !canStartTest.value) return
+  if (props.maintenanceBlocked) return
 
   resetState()
   status.value = 'connecting'

@@ -16,6 +16,7 @@ This directory contains files for deploying Sub2API on Linux servers and Apple-s
 |------|-------------|
 | `docker-compose.yml` | Docker Compose configuration (named volumes) |
 | `docker-compose.local.yml` | Docker Compose configuration (local directories, easy migration) |
+| `docker-compose.codex.yml` | Optional `codex-proxy-rs` Codex upstream bridge overlay |
 | `docker-deploy.sh` | **One-click Docker deployment script (recommended)** |
 | `apple-container.sh` | Native Apple `container` lifecycle script |
 | `APPLE_CONTAINER.md` | Apple `container` deployment and operations guide |
@@ -28,6 +29,7 @@ This directory contains files for deploying Sub2API on Linux servers and Apple-s
 | `DATAMANAGEMENTD_CN.md` | datamanagementd 部署与联动说明（中文） |
 | `config.example.yaml` | Example configuration file |
 | `EDGE_SECURITY.md` | Reverse proxy, CDN/WAF, trusted proxy, and ingress hardening guide |
+| `CODEX_BRIDGE_CN.md` | Sub2API 与 `codex-proxy-rs` 的 Codex 上游桥接说明 |
 
 ---
 
@@ -56,10 +58,10 @@ Use the automated preparation script for the easiest setup:
 
 ```bash
 # Download and run the preparation script
-curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/docker-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/wudiyidashi/sub2api/main/deploy/docker-deploy.sh | bash
 
 # Or download first, then run
-curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/docker-deploy.sh -o docker-deploy.sh
+curl -sSL https://raw.githubusercontent.com/wudiyidashi/sub2api/main/deploy/docker-deploy.sh -o docker-deploy.sh
 chmod +x docker-deploy.sh
 ./docker-deploy.sh
 ```
@@ -92,7 +94,7 @@ If you prefer manual control:
 
 ```bash
 # Clone repository
-git clone https://github.com/Wei-Shaw/sub2api.git
+git clone https://github.com/wudiyidashi/sub2api.git
 cd sub2api/deploy
 
 # Configure environment
@@ -260,6 +262,7 @@ docker compose down -v
 | `ADMIN_EMAIL` | No | *(auto-generated)* | Admin email (login username) |
 | `ADMIN_PASSWORD` | No | *(auto-generated)* | Admin password (8-72 bytes) |
 | `TZ` | No | `Asia/Shanghai` | Timezone |
+| `UPDATE_GITHUB_REPO` | No | `wudiyidashi/sub2api` | GitHub repository used by panel hot updates and release checks. |
 | `UPDATE_GITHUB_TOKEN` | No | *(empty)* | Token for `api.github.com` release checks only; asset downloads remain anonymous. |
 | `GEMINI_OAUTH_CLIENT_ID` | No | *(builtin)* | Google OAuth client ID (Gemini OAuth). Leave empty to use the built-in Gemini CLI client. |
 | `GEMINI_OAUTH_CLIENT_SECRET` | No | *(builtin)* | Google OAuth client secret (Gemini OAuth). Leave empty to use the built-in Gemini CLI client. |
@@ -398,12 +401,12 @@ For production servers using systemd.
 ### One-Line Installation
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/wudiyidashi/sub2api/main/deploy/install.sh | sudo bash
 ```
 
 ### Manual Installation
 
-1. Download the latest release from [GitHub Releases](https://github.com/Wei-Shaw/sub2api/releases)
+1. Download the latest release from [GitHub Releases](https://github.com/wudiyidashi/sub2api/releases)
 2. Extract and copy the binary to `/opt/sub2api/`
 3. Copy `sub2api.service` to `/etc/systemd/system/`
 4. Run:

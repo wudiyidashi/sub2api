@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1.7
+
+ARG SUB2API_BUILDER_IMAGE=sub2api-account-driver-builder:latest
+ARG RUST_IMAGE=rust:1.97-slim-bookworm
+ARG RUNTIME_IMAGE=postgres:18-bookworm
+
+# 原仓库 backend-builder 提供已嵌入面板的宿主与定价资源
+FROM ${SUB2API_BUILDER_IMAGE} AS host-builder
+
+FROM ${RUST_IMAGE} AS driver-builder
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential cmake pkg-config libssl-dev protobuf-compiler git && rm -rf /var/lib/apt/lists/*
+WORKDIR /workspace/drivers/codex-rs
+# 构建前必须以版本锁及维护补丁准备 upstream，不在此追踪浮动分支
+COPY drivers/codex-rs/ ./
+COPY backend/pkg/accountdriverapi/v1/account_driver.proto /workspace/backend/pkg/accountdriverapi/v1/account_driver.proto
+RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/usr/local/cargo/git --mount=type=cache,target=/workspace/drivers/codex-rs/target cargo build --release --locked && cp target/release/sub2api-codex-account-driver /sub2api-codex-account-driver
+
+# Rust driver 为 glibc ELF，默认 Alpine/musl 宿主镜像不能直接运行
+# 此镜像仅复用 PostgreSQL 客户端工具与 gosu，不启动 PostgreSQL 服务
+FROM ${RUNTIME_IMAGE}
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata wget && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 1000 sub2api && useradd --uid 1000 --gid 1000 --create-home --shell /bin/sh sub2api
+WORKDIR /app
+COPY --from=host-builder --chown=sub2api:sub2api /app/sub2api /app/sub2api
+COPY --from=host-builder --chown=sub2api:sub2api /app/backend/resources /app/resources
+COPY --from=driver-builder /sub2api-codex-account-driver /app/drivers/sub2api-codex-account-driver
+COPY deploy/docker-entrypoint.account-drivers.sh /app/docker-entrypoint.account-drivers.sh
+RUN chmod 0555 /app/sub2api /app/drivers/sub2api-codex-account-driver /app/docker-entrypoint.account-drivers.sh \
+    && sha256sum /app/drivers/sub2api-codex-account-driver | cut -d ' ' -f 1 > /app/drivers/codex-rs-http.sha256 \
+    && chmod 0444 /app/drivers/codex-rs-http.sha256 \
+    && mkdir -p /app/data && chown sub2api:sub2api /app/data
+
+ENV ACCOUNT_DRIVERS_CODEX_RS_HTTP_ENABLED=true \
+    ACCOUNT_DRIVERS_CODEX_RS_HTTP_EXECUTABLE_PATH=/app/drivers/sub2api-codex-account-driver \
+    ACCOUNT_DRIVERS_CODEX_RS_HTTP_START_TIMEOUT_SECONDS=10
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 CMD wget -q -T 5 -O /dev/null http://localhost:${SERVER_PORT:-8080}/health || exit 1
+ENTRYPOINT ["/app/docker-entrypoint.account-drivers.sh"]
+CMD ["/app/sub2api"]

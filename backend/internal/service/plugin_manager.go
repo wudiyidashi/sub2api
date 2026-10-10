@@ -50,7 +50,8 @@ type PluginManager struct {
 	kvStore PluginKVStore
 	// accountDirectory 为声明了对应能力的插件提供账号目录与出站身份解析（敏感能力）；
 	// 通过 SetAccountDirectory 在启动装配阶段注入，为 nil 时插件拿不到该能力。
-	accountDirectory PluginAccountDirectory
+	accountDirectory     PluginAccountDirectory
+	accountDriverManager *AccountDriverManager
 
 	operationMu        sync.Mutex
 	mu                 sync.Mutex
@@ -64,14 +65,15 @@ type PluginManager struct {
 
 func NewPluginManager(repo PluginRepository, encryptor SecretEncryptor, cfg *config.Config, hostInfo PluginHostInfo, kvStore PluginKVStore) *PluginManager {
 	return &PluginManager{
-		repo:               repo,
-		encryptor:          encryptor,
-		cfg:                cfg,
-		hostInfo:           hostInfo,
-		installer:          NewPluginPackageInstaller(cfg, hostInfo),
-		kvStore:            kvStore,
-		runtimes:           make(map[int64]*pluginRuntime),
-		localInstallations: make(map[int64]*PluginInstallation),
+		repo:                 repo,
+		encryptor:            encryptor,
+		cfg:                  cfg,
+		hostInfo:             hostInfo,
+		installer:            NewPluginPackageInstaller(cfg, hostInfo),
+		kvStore:              kvStore,
+		accountDriverManager: NewAccountDriverManager(cfg),
+		runtimes:             make(map[int64]*pluginRuntime),
+		localInstallations:   make(map[int64]*PluginInstallation),
 	}
 }
 
@@ -103,6 +105,11 @@ func (m *PluginManager) Start(ctx context.Context) error {
 	m.mu.Unlock()
 	m.operationMu.Unlock()
 
+	if m.accountDriverManager != nil {
+		if err := m.accountDriverManager.Start(ctx); err != nil {
+			slog.Warn("account_driver_start_failed", "driver_id", AccountDriverCodexHTTP, "error", err)
+		}
+	}
 	go m.reconcileLoop(reconcileCtx, done)
 	if err := m.reconcileOnce(reconcileCtx); err != nil {
 		slog.Warn("plugin_initial_reconcile_failed", "error", err)
@@ -111,6 +118,9 @@ func (m *PluginManager) Start(ctx context.Context) error {
 }
 
 func (m *PluginManager) Stop() {
+	if m.accountDriverManager != nil {
+		m.accountDriverManager.Stop()
+	}
 	m.mu.Lock()
 	cancel := m.reconcileCancel
 	done := m.reconcileDone

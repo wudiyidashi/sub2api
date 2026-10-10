@@ -180,6 +180,11 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 	if executor == nil {
 		return nil, errors.New("oauth refresh executor is nil")
 	}
+	ctx, releaseOperation, operationErr := AcquireAccountDriverOperation(ctx, account.ID, "refresh")
+	if operationErr != nil {
+		return nil, operationErr
+	}
+	defer releaseOperation()
 	requestPath := isOAuthRefreshRequestPath(ctx)
 	cacheKey := executor.CacheKey(account)
 

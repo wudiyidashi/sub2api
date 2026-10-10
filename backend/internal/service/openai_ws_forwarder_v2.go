@@ -34,7 +34,13 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 	attempt int,
 	lastFailureReason string,
 	agentTaskRecoveryTried *bool,
-) (*OpenAIForwardResult, error) {
+) (forwardResult *OpenAIForwardResult, forwardErr error) {
+	managedRequestSent := false
+	defer func() {
+		if usesCodexHTTPDriver(account) && managedRequestSent && forwardErr != nil && !managedWSMayHaveBeenSent(forwardErr) {
+			forwardErr = &managedWSMaySentError{forwardErr}
+		}
+	}()
 	if s == nil || account == nil {
 		return nil, wrapOpenAIWSFallback("invalid_state", errors.New("service or account is nil"))
 	}
@@ -203,14 +209,18 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 	defer acquireCancel()
 
 	lease, err := s.getOpenAIWSConnPool().Acquire(acquireCtx, openAIWSAcquireRequest{
-		Account: account,
-		WSURL:   wsURL,
-		Headers: wsHeaders,
+		ManagedScope:                 managedAccountWSScope(c, nil, sessionHash),
+		ManagedGeneration:            AccountDriverRuntimeGeneration(),
+		ManagedGenerationCanContinue: s.accountDriverGenerationCanContinue(),
+		Account:                      account,
+		WSURL:                        wsURL,
+		Headers:                      wsHeaders,
 		HeadersFactory: func(factoryCtx context.Context, headers http.Header) (http.Header, error) {
 			return s.refreshOpenAIAgentIdentityHeaders(factoryCtx, account, headers)
 		},
-		PreferredConnID: preferredConnID,
-		ForceNewConn:    forceNewConn,
+		PreferredConnID:    preferredConnID,
+		ForcePreferredConn: usesCodexHTTPDriver(account) && previousResponseID != "",
+		ForceNewConn:       forceNewConn,
 		ProxyURL: func() string {
 			if account.ProxyID != nil && account.Proxy != nil {
 				return account.Proxy.URL()
@@ -343,6 +353,7 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 	}
 
 	if err := lease.WriteJSONWithContextTimeout(ctx, payload, s.openAIWSWriteTimeout()); err != nil {
+		managedRequestSent = managedWSMayHaveBeenSent(err)
 		lease.MarkBroken()
 		logOpenAIWSModeInfo(
 			"write_request_fail account_id=%d conn_id=%s cause=%s payload_bytes=%d",
@@ -353,6 +364,7 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 		)
 		return nil, wrapOpenAIWSFallback("write_request", err)
 	}
+	managedRequestSent = true
 	if debugEnabled {
 		logOpenAIWSModeDebug(
 			"write_request_sent account_id=%d conn_id=%s stream=%v payload_bytes=%d previous_response_id=%s",

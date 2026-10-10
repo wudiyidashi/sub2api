@@ -1,9 +1,12 @@
 export default {
   promptAudit: {
-    title: '提示词审计',
-    description: '通过 OpenAI 兼容 Qwen3Guard 节点异步复核或同步阻止用户输入；事件的完整提示词会入库保存，仅供管理员复核。',
+    title: '内容审计',
+    description: '统一查看 API 请求链路、上下游诊断内容和提示词风险事件。',
     configVersion: '配置版本 v{version}',
-    tabs: { config: '配置', events: '事件' },
+    tabs: { config: '配置', events: '风险事件', requests: '请求审计' },
+    requests: {
+      title: 'API 请求审计', description: '查看每个 API 请求的链路、状态、耗时和已持久化的诊断内容。', timeRange: '时间范围', time: '时间', kind: '结果', success: '成功', error: '失败', platform: '平台', model: '模型', requestId: '请求 ID', keyword: '关键词', sort: '排序', newest: '最新', slowest: '最慢', slowestTtft: '最慢首 token', route: '接口', latency: '耗时', identity: '身份 / 账号', risk: '风险 / 错误', empty: '暂无请求记录', loadFailed: '请求审计加载失败', detailTitle: '请求详情', viewRisk: '查看错误详情', detailLoadFailed: '请求详情加载失败', clientRequest: '客户端请求', upstreamRequest: '上游请求', upstreamResponse: '上游响应', clientResponse: '客户端响应', upstreamAttempts: '上游尝试与错误', noAttempts: '没有已保存的上游尝试。', sanitizedPayloads: '已保存的脱敏错误内容', riskEvents: '关联风险事件', noRawPayload: '没有可用的原始请求体，仅展示服务端实际保存的数据。', notPersisted: '此段内容未持久化。', headers: 'Headers', body: 'Body / JSON', raw: '原始文本', sseEvents: 'SSE 事件', websocketEvents: 'WebSocket 事件', truncated: '已截断'
+    },
     actions: { refresh: '刷新运行态', retry: '重试', Allow: '放行', Warn: '警告', Block: '阻止' },
     common: { actions: '操作', never: '从未' },
     mode: { off: '已关闭', async_audit: '异步只审计', blocking: '同步审计并阻止' },

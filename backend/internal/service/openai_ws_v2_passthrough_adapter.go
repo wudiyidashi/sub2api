@@ -22,6 +22,8 @@ import (
 type openAIWSClientFrameConn struct {
 	conn                 *coderws.Conn
 	controlCtx           context.Context
+	auditCtx             context.Context
+	auditHeaders         http.Header
 	interTurnIdleTimeout time.Duration
 	interTurnStarted     chan struct{}
 	waitingForNextTurn   atomic.Bool
@@ -359,6 +361,8 @@ func (l *openAIWSPassthroughTurnLifecycle) finishTerminalWrite(succeeded bool, o
 
 type openAIWSPassthroughFirstOutputFrameConn struct {
 	inner             openaiwsv2.FrameConn
+	auditCtx          context.Context
+	auditHeaders      http.Header
 	resolveDeadline   func(payload []byte) openAIWSPassthroughFirstOutputDeadline
 	activeReadTimeout time.Duration
 
@@ -426,6 +430,7 @@ func (c *openAIWSPassthroughFirstOutputFrameConn) ReadFrame(ctx context.Context)
 		select {
 		case result := <-readResultCh:
 			if result.err == nil {
+				captureAPIRequestAuditFrame(c.auditCtx, APIRequestAuditDirectionUpstreamResponse, result.payload, c.auditHeaders)
 				c.observeUpstreamActivity(result.msgType, result.payload)
 			}
 			return result.msgType, result.payload, result.err
@@ -464,6 +469,7 @@ func (c *openAIWSPassthroughFirstOutputFrameConn) WriteFrame(ctx context.Context
 	if msgType == coderws.MessageText && strings.TrimSpace(gjson.GetBytes(payload, "type").String()) == "response.create" {
 		generation = c.armDeadline(payload)
 	}
+	captureAPIRequestAuditFrame(c.auditCtx, APIRequestAuditDirectionUpstreamRequest, payload, c.auditHeaders)
 	if err := c.inner.WriteFrame(ctx, msgType, payload); err != nil {
 		c.disarmDeadline(generation)
 		return err
@@ -613,6 +619,9 @@ func (c *openAIWSClientFrameConn) ReadFrame(ctx context.Context) (coderws.Messag
 		c.interTurnStarted,
 		func() bool { return c.waitingForNextTurn.Load() },
 	)
+	if err == nil {
+		captureAPIRequestAuditFrame(c.auditCtx, APIRequestAuditDirectionClientRequest, payload, c.auditHeaders)
+	}
 	return msgType, payload, err
 }
 
@@ -651,6 +660,7 @@ func (c *openAIWSClientFrameConn) WriteFrame(ctx context.Context, msgType coderw
 			payload = c.restoreToolNames(payload)
 		}
 	}
+	captureAPIRequestAuditFrame(c.auditCtx, APIRequestAuditDirectionClientResponse, payload, c.auditHeaders)
 	return c.conn.Write(ctx, msgType, payload)
 }
 
@@ -876,6 +886,7 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 			return fmt.Errorf("refresh ws authentication headers: %w", err)
 		}
 		dialCtx, cancelDial := context.WithTimeout(ctx, s.openAIWSDialTimeout())
+		dialCtx = withManagedAccountWSBinding(dialCtx, account, managedAccountWSScope(c, firstClientMessage, ""))
 		upstreamConn, statusCode, handshakeHeaders, err = dialer.Dial(dialCtx, wsURL, headers, proxyURL)
 		cancelDial()
 		if err == nil {
@@ -923,6 +934,8 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 	}
 	relayUpstreamFrameConn := &openAIWSPassthroughFirstOutputFrameConn{
 		inner:             upstreamFrameConn,
+		auditCtx:          ctx,
+		auditHeaders:      handshakeHeaders,
 		activeReadTimeout: s.openAIWSPassthroughIdleTimeout(),
 		deadlineChanged:   make(chan struct{}, 1),
 		resolveDeadline: func(payload []byte) openAIWSPassthroughFirstOutputDeadline {
@@ -954,8 +967,15 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 	turnLifecycle := newOpenAIWSPassthroughTurnLifecycle(true)
 	var acceptedTurnStartedAt atomic.Pointer[time.Time]
 	clientFrameConn := &openAIWSClientFrameConn{
-		conn:                 clientConn,
-		controlCtx:           ctx,
+		conn:       clientConn,
+		controlCtx: ctx,
+		auditCtx:   ctx,
+		auditHeaders: func() http.Header {
+			if c != nil && c.Request != nil {
+				return c.Request.Header
+			}
+			return nil
+		}(),
 		interTurnIdleTimeout: s.openAIWSIngressInterTurnIdleTimeout(),
 		interTurnStarted:     make(chan struct{}, 1),
 		restoreResponseModel: func(payload []byte) []byte {

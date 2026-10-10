@@ -603,7 +603,14 @@ func (s *OpenAIGatewayService) ForwardImages(
 	body []byte,
 	parsed *OpenAIImagesRequest,
 	channelMappedModel string,
-) (*OpenAIForwardResult, error) {
+) (forwardResult *OpenAIForwardResult, forwardErr error) {
+	ctx, releaseDriverOperation, admissionErr := acquireOpenAIAccountDriverOperation(ctx, account)
+	if admissionErr != nil {
+		return nil, admissionErr
+	}
+	defer releaseDriverOperation()
+	ctx, driverTracker := withAccountDriverAttemptTracking(ctx)
+	defer func() { forwardErr = restrictAccountDriverFailover(account, driverTracker, forwardErr) }()
 	if parsed == nil {
 		return nil, fmt.Errorf("parsed images request is required")
 	}

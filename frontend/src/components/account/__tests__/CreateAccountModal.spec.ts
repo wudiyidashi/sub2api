@@ -14,6 +14,11 @@ const {
   showWarningMock,
   importCodexSessionMock,
   createOpenAICodexPATMock,
+  listDriversMock,
+  generateAuthUrlMock,
+  exchangeCodeMock,
+  refreshOpenAITokenMock,
+  showErrorMock,
   authIsSimpleMode,
 } = vi.hoisted(() => ({
   createAccountMock: vi.fn(),
@@ -22,12 +27,17 @@ const {
   showWarningMock: vi.fn(),
   importCodexSessionMock: vi.fn(),
   createOpenAICodexPATMock: vi.fn(),
+  listDriversMock: vi.fn(),
+  generateAuthUrlMock: vi.fn(),
+  exchangeCodeMock: vi.fn(),
+  refreshOpenAITokenMock: vi.fn(),
+  showErrorMock: vi.fn(),
   authIsSimpleMode: { value: true },
 }))
 
 vi.mock('@/stores/app', () => ({
   useAppStore: () => ({
-    showError: vi.fn(),
+    showError: showErrorMock,
     showSuccess: vi.fn(),
     showWarning: showWarningMock,
   }),
@@ -50,7 +60,11 @@ vi.mock('@/api/admin', () => ({
       checkMixedChannelRisk: vi.fn().mockResolvedValue({ has_risk: false }),
       importCodexSession: importCodexSessionMock,
       createOpenAICodexPAT: createOpenAICodexPATMock,
+      generateAuthUrl: generateAuthUrlMock,
+      exchangeCode: exchangeCodeMock,
+      refreshOpenAIToken: refreshOpenAITokenMock,
     },
+    accountDrivers: { list: listDriversMock },
     settings: {
       getWebSearchEmulationConfig: vi.fn().mockResolvedValue({ enabled: false, providers: [] }),
       getSettings: vi.fn().mockResolvedValue({}),
@@ -74,6 +88,8 @@ vi.mock('vue-i18n', async () => {
 })
 
 import CreateAccountModal from '../CreateAccountModal.vue'
+import AccountDriverSelector from '@/features/account-drivers/AccountDriverSelector.vue'
+import Select from '@/components/common/Select.vue'
 
 const BaseDialogStub = defineComponent({
   name: 'BaseDialog',
@@ -90,8 +106,8 @@ const OAuthAuthorizationFlowStub = defineComponent({
     showCodexPatOption: Boolean,
     initialInputMethod: String,
   },
-  data: () => ({ inputMethod: 'manual' }),
-  emits: ['import-codex-session', 'import-codex-pat'],
+  data: () => ({ inputMethod: 'manual', authCode: 'auth-code', oauthState: 'oauth-state' }),
+  emits: ['import-codex-session', 'import-codex-pat', 'generate-url', 'validate-refresh-token', 'validate-mobile-refresh-token'],
   template: `
     <div>
       <button data-testid="import-codex-session" @click="$emit('import-codex-session', 'session-json')">session</button>
@@ -215,6 +231,12 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
       warnings: [],
     })
     createOpenAICodexPATMock.mockReset().mockResolvedValue({})
+    listDriversMock.mockReset().mockResolvedValue({ drivers: [], default_driver_id: 'native' })
+    generateAuthUrlMock.mockReset().mockResolvedValue({ auth_url: 'https://auth.example.com/?state=oauth-state', session_id: 'session' })
+    const tokenInfo = { access_token: 'access', refresh_token: 'refresh', expires_at: 2000000000, email: 'account@example.com' }
+    exchangeCodeMock.mockReset().mockResolvedValue(tokenInfo)
+    refreshOpenAITokenMock.mockReset().mockResolvedValue(tokenInfo)
+    showErrorMock.mockReset()
   })
 
   afterEach(() => vi.useRealTimers())
@@ -293,7 +315,150 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     await submitApiKeyAccount('openai')
 
     expect(createAccountMock).toHaveBeenCalledTimes(1)
+    expect(createAccountMock.mock.calls[0]?.[0]?.account_driver_id).toBe('native')
+    expect(createAccountMock.mock.calls[0]?.[0]).not.toHaveProperty('driver_settings')
     expect(createAccountMock.mock.calls[0]?.[0]?.extra?.openai_long_context_billing_enabled).toBe(false)
+  })
+
+  it('keeps the native management method when creating a Bedrock account through the shared flow', async () => {
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'admin.accounts.bedrockLabel')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('Bedrock account')
+    await wrapper.get('input[placeholder="AKIA..."]').setValue('test-access-key')
+    await wrapper.get('input[type="password"][required]').setValue('test-secret')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    expect(createAccountMock.mock.calls[0]?.[0]).toMatchObject({
+      platform: 'anthropic', type: 'bedrock', account_driver_id: 'native',
+      credentials: { aws_access_key_id: 'test-access-key', aws_secret_access_key: 'test-secret' }
+    })
+    expect(createAccountMock.mock.calls[0]?.[0]).not.toHaveProperty('driver_settings')
+    wrapper.unmount()
+  })
+
+  describe('ready enhanced HTTP accounts', () => {
+    function setEnhancedCatalog(protocols: string[]) {
+      const capabilities = { authorization: true, import: true, refresh: true, quota: true, test: true, models: true, settings: false, switch: false }
+      listDriversMock.mockResolvedValue({ default_driver_id: 'native', drivers: [
+        { id: 'native', name: 'Native', version: 'builtin', available: true, platforms: ['openai', 'anthropic', 'gemini'], account_types: ['oauth', 'apikey'], capabilities },
+        { id: 'codex-rs-http', name: 'Codex HTTP/SSE', version: '1', available: true, platforms: ['openai'], account_types: ['oauth'], capabilities, lifecycle_driver_id: 'native', execution_driver_id: 'codex-rs-http', transport_protocols: protocols }
+      ] })
+    }
+    beforeEach(() => setEnhancedCatalog(['http', 'sse']))
+
+    async function selectEnhancedAccount(withWebSocket = false) {
+      const wrapper = mountModal()
+      await selectButtonByText(wrapper, 'OpenAI')
+      await flushPromises()
+      wrapper.getComponent(AccountDriverSelector).getComponent(Select).vm.$emit('update:modelValue', 'codex-rs-http')
+      await flushPromises()
+      expect(wrapper.getComponent(AccountDriverSelector).props('modelValue')).toBe('codex-rs-http')
+      expect(wrapper.find('[data-testid="create-openai-ws-mode"]').exists()).toBe(withWebSocket)
+      await wrapper.get('form#create-account-form input[type="text"]').setValue('Enhanced account')
+      return wrapper
+    }
+
+    async function openEnhancedOAuth() {
+      const wrapper = await selectEnhancedAccount()
+      await wrapper.get('form#create-account-form').trigger('submit.prevent')
+      await flushPromises()
+      return wrapper
+    }
+
+    it('reuses host OAuth and submits the selected enhanced binding with HTTP transport', async () => {
+      const wrapper = await openEnhancedOAuth()
+      const flow = wrapper.getComponent(OAuthAuthorizationFlowStub)
+      expect(flow.props('showCodexSessionImportOption')).toBe(true)
+      expect(flow.props('showAgentIdentityOption')).toBe(false)
+      expect(flow.props('showCodexPatOption')).toBe(false)
+      flow.vm.$emit('generate-url')
+      await flushPromises()
+      await selectButtonByText(wrapper, 'admin.accounts.oauth.completeAuth')
+      await flushPromises()
+      expect(exchangeCodeMock).toHaveBeenCalledWith('/admin/openai/exchange-code', expect.objectContaining({ code: 'auth-code', state: 'oauth-state' }))
+      expect(createAccountMock).toHaveBeenCalledWith(expect.objectContaining({
+        platform: 'openai', type: 'oauth', account_driver_id: 'codex-rs-http',
+        credentials: expect.objectContaining({ access_token: 'access', refresh_token: 'refresh' }),
+        extra: expect.objectContaining({ openai_oauth_responses_websockets_v2_mode: 'off', openai_oauth_responses_websockets_v2_enabled: false })
+      }))
+      wrapper.unmount()
+    })
+
+    it.each(['off', 'ctx_pool', 'passthrough', 'http_bridge'])('supports %s on a ready WebSocket runtime using the existing account settings', async mode => {
+      setEnhancedCatalog(['http', 'sse', 'websocket'])
+      const wrapper = await selectEnhancedAccount(true)
+      const wsSelect = wrapper.get('[data-testid="create-openai-ws-mode-select"]').getComponent(Select)
+      wsSelect.vm.$emit('update:modelValue', mode)
+      await flushPromises()
+      await wrapper.get('form#create-account-form').trigger('submit.prevent')
+      await flushPromises()
+      wrapper.getComponent(OAuthAuthorizationFlowStub).vm.$emit('validate-refresh-token', 'import-refresh-token')
+      await flushPromises()
+      expect(createAccountMock).toHaveBeenCalledWith(expect.objectContaining({
+        account_driver_id: 'codex-rs-http',
+        extra: expect.objectContaining({
+          openai_oauth_responses_websockets_v2_mode: mode,
+          openai_oauth_responses_websockets_v2_enabled: mode !== 'off'
+        })
+      }))
+      wrapper.unmount()
+    })
+
+    it('clears an unsaved native WebSocket choice when selecting an HTTP-only enhanced runtime', async () => {
+      const wrapper = mountModal()
+      await selectButtonByText(wrapper, 'OpenAI')
+      await flushPromises()
+      wrapper.get('[data-testid="create-openai-ws-mode-select"]').getComponent(Select).vm.$emit('update:modelValue', 'ctx_pool')
+      await flushPromises()
+      wrapper.getComponent(AccountDriverSelector).getComponent(Select).vm.$emit('update:modelValue', 'codex-rs-http')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="create-openai-ws-mode"]').exists()).toBe(false)
+      await wrapper.get('form#create-account-form input[type="text"]').setValue('HTTP enhanced')
+      await wrapper.get('form#create-account-form').trigger('submit.prevent')
+      await flushPromises()
+      wrapper.getComponent(OAuthAuthorizationFlowStub).vm.$emit('validate-refresh-token', 'import-refresh-token')
+      await flushPromises()
+      expect(createAccountMock.mock.calls[0]?.[0]?.extra).toMatchObject({
+        openai_oauth_responses_websockets_v2_mode: 'off', openai_oauth_responses_websockets_v2_enabled: false
+      })
+      wrapper.unmount()
+    })
+
+    it.each(['validate-refresh-token', 'validate-mobile-refresh-token'] as const)('keeps the selected enhanced binding after %s', async event => {
+      const wrapper = await openEnhancedOAuth()
+      wrapper.getComponent(OAuthAuthorizationFlowStub).vm.$emit(event, 'import-refresh-token')
+      await flushPromises()
+      expect(refreshOpenAITokenMock).toHaveBeenCalled()
+      expect(createAccountMock).toHaveBeenCalledWith(expect.objectContaining({ account_driver_id: 'codex-rs-http', platform: 'openai', type: 'oauth' }))
+      wrapper.unmount()
+    })
+
+    it('passes the enhanced binding through standard Codex Session import and blocks unsupported auth modes', async () => {
+      const wrapper = await openEnhancedOAuth()
+      const flow = wrapper.getComponent(OAuthAuthorizationFlowStub)
+      flow.vm.$emit('import-codex-session', JSON.stringify({ tokens: { access_token: 'access', refresh_token: 'refresh' } }))
+      await flushPromises()
+      expect(importCodexSessionMock).toHaveBeenCalledWith(expect.objectContaining({ account_driver_id: 'codex-rs-http' }))
+      flow.vm.$emit('import-codex-session', JSON.stringify({ auth_mode: 'agentidentity', agent_identity: {} }))
+      flow.vm.$emit('import-codex-pat', 'pat')
+      await flushPromises()
+      expect(importCodexSessionMock).toHaveBeenCalledTimes(1)
+      expect(createOpenAICodexPATMock).not.toHaveBeenCalled()
+      expect(showErrorMock).toHaveBeenCalledWith('admin.accounts.accountDriver.unsupportedImport')
+      wrapper.unmount()
+    })
+
+    it.each(['API Key', 'Gemini'])('selects native management with an explanation when switching to %s', async selection => {
+      const wrapper = await selectEnhancedAccount()
+      await selectButtonByText(wrapper, selection)
+      await flushPromises()
+      const selector = wrapper.getComponent(AccountDriverSelector)
+      expect(selector.props('modelValue')).toBe('native')
+      expect(selector.get('[role="status"]').text()).toBe('admin.accounts.accountDriver.selectionReset')
+      wrapper.unmount()
+    })
   })
 
   it('omits the upstream request id header from extra when left empty', async () => {

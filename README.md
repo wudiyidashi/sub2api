@@ -27,6 +27,16 @@ Please read the following carefully before using this project:
 - **📖 Disclaimer**: This project is provided for technical learning and research purposes only. The authors assume no liability for account bans, service interruptions, data loss, or any other direct or indirect damages resulting from the use of this project.
 - **🚫 No Commercial Authorization**: The developers of this project have never authorized any individual or organization to conduct any form of commercial operation based on this project. Any commercial activity conducted in the name of or based on this project is unrelated to this project and its developers, and all resulting disputes, losses, and legal liabilities shall be borne solely by the party conducting such activity.
 
+## 最新更新
+
+### 2026-10-10
+
+- OpenAI accounts now support managed Codex HTTP/SSE and WebSocket drivers with runtime maintenance and hot upgrades.
+- Content Audit now preserves and displays HTTP and WebSocket request/response contents, with usage-style filters and frame-level detail views.
+- GitHub release checks and panel updates can use the operator repository configured by `UPDATE_GITHUB_REPO`.
+
+完整更新记录见 [docs/releases/release-notes.md](docs/releases/release-notes.md)。
+
 ## ❤️ Sponsors
 
 > [Want to appear here?](mailto:support@sub2api.org)
@@ -235,7 +245,7 @@ One-click installation script that downloads pre-built binaries from GitHub Rele
 #### Installation Steps
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/wudiyidashi/sub2api/main/deploy/install.sh | sudo bash
 ```
 
 The script will:
@@ -285,7 +295,7 @@ sudo journalctl -u sub2api -f
 sudo systemctl restart sub2api
 
 # Uninstall
-curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install.sh | sudo bash -s -- uninstall -y
+curl -sSL https://raw.githubusercontent.com/wudiyidashi/sub2api/main/deploy/install.sh | sudo bash -s -- uninstall -y
 ```
 
 ---
@@ -308,7 +318,7 @@ Use the automated deployment script for easy setup:
 mkdir -p sub2api-deploy && cd sub2api-deploy
 
 # Download and run deployment preparation script
-curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/docker-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/wudiyidashi/sub2api/main/deploy/docker-deploy.sh | bash
 
 # Start services
 docker compose up -d
@@ -330,7 +340,7 @@ If you prefer manual setup:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/Wei-Shaw/sub2api.git
+git clone https://github.com/wudiyidashi/sub2api.git
 cd sub2api/deploy
 
 # 2. Copy environment configuration
@@ -462,7 +472,7 @@ rm -rf data/ postgres_data/ redis_data/
 Apple-silicon Macs running macOS 26 can run the full Sub2API, PostgreSQL, and Redis stack with Apple `container` 1.1.0 or newer:
 
 ```bash
-git clone https://github.com/Wei-Shaw/sub2api.git
+git clone https://github.com/wudiyidashi/sub2api.git
 cd sub2api/deploy
 ./apple-container.sh init
 ./apple-container.sh up
@@ -488,7 +498,7 @@ Build and run from source code for development or customization.
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/Wei-Shaw/sub2api.git
+git clone https://github.com/wudiyidashi/sub2api.git
 cd sub2api
 
 # 2. Install pnpm (if not already installed)

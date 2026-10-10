@@ -1,0 +1,13 @@
+**
+!drivers/
+!drivers/codex-rs/
+!drivers/codex-rs/**
+drivers/codex-rs/target/
+drivers/codex-rs/upstream/.git/
+!backend/
+!backend/pkg/
+!backend/pkg/accountdriverapi/
+!backend/pkg/accountdriverapi/v1/
+!backend/pkg/accountdriverapi/v1/account_driver.proto
+!deploy/
+!deploy/docker-entrypoint.account-drivers.sh

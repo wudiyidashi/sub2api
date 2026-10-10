@@ -1205,12 +1205,15 @@ export interface OpenCodeGoUsageSettings {
   debounce_minutes: number
 }
 
+export type { AccountDriver, AccountDriverBinding, AccountDriverCapabilities, AccountDriverCatalog } from '@/features/account-drivers/types'
+
 export interface Account {
   id: number
   name: string
   notes?: string | null
   platform: AccountPlatform
   type: AccountType
+  account_driver?: import('@/features/account-drivers/types').AccountDriverBinding
   // 后端响应里 credentials 已脱敏：access_token / refresh_token / id_token /
   // api_key / session_key / cookie / aws_secret_access_key / aws_session_token /
   // service_account_json / service_account / private_key 不会出现，
@@ -1531,6 +1534,8 @@ export interface CreateAccountRequest {
   notes?: string | null
   platform: AccountPlatform
   type: AccountType
+  account_driver_id?: string
+  driver_settings?: Record<string, unknown>
   credentials: Record<string, unknown>
   extra?: Record<string, unknown>
   proxy_id?: number | null
@@ -1549,6 +1554,8 @@ export interface UpdateAccountRequest {
   name?: string
   notes?: string | null
   type?: AccountType
+  account_driver_id?: string
+  driver_settings?: Record<string, unknown>
   credentials?: Record<string, unknown>
   extra?: Record<string, unknown>
   proxy_id?: number | null
@@ -1648,6 +1655,8 @@ export interface AdminDataAccount {
   notes?: string | null
   platform: AccountPlatform
   type: AccountType
+  account_driver_id?: string
+  driver_settings?: Record<string, unknown>
   credentials: Record<string, unknown>
   extra?: Record<string, unknown>
   proxy_key?: string | null
@@ -1675,6 +1684,7 @@ export interface AdminDataImportResult {
 }
 
 export interface CodexSessionImportRequest {
+  account_driver_id?: string
   content?: string
   contents?: string[]
   name?: string

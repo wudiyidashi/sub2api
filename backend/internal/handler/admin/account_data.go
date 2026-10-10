@@ -58,6 +58,8 @@ type DataProxy struct {
 // 影子的独立调度配置(priority/并发/分组/status 管理员可单独调)亦不在本备份范围,属已知局限
 // (外审第6轮裁决:保持排除 + 前端警告,而非升级格式做完整往返)。
 type DataAccount struct {
+	AccountDriverID    string         `json:"account_driver_id,omitempty"`
+	DriverSettings     map[string]any `json:"driver_settings,omitempty"`
 	Name               string         `json:"name"`
 	Notes              *string        `json:"notes,omitempty"`
 	Platform           string         `json:"platform"`
@@ -98,6 +100,10 @@ func buildProxyKey(protocol, host string, port int, username, password string) s
 }
 
 func (h *AccountHandler) ExportData(c *gin.Context) {
+	if err := service.ValidateAccountDriverFilter(c.Query("account_driver_id")); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 	ctx := c.Request.Context()
 
 	selectedIDs, err := parseAccountIDs(c)
@@ -200,6 +206,7 @@ func (h *AccountHandler) ExportData(c *gin.Context) {
 			expiresAt = &v
 		}
 		dataAccounts = append(dataAccounts, DataAccount{
+			AccountDriverID:    acc.EffectiveAccountDriverID(),
 			Name:               acc.Name,
 			Notes:              acc.Notes,
 			Platform:           acc.Platform,
@@ -434,6 +441,8 @@ func (h *AccountHandler) importData(ctx context.Context, req DataImportRequest) 
 		enrichCredentialsFromIDToken(&item)
 
 		accountInput := &service.CreateAccountInput{
+			AccountDriverID:      item.AccountDriverID,
+			DriverSettings:       item.DriverSettings,
 			Name:                 item.Name,
 			Notes:                item.Notes,
 			Platform:             item.Platform,
@@ -506,12 +515,16 @@ func (h *AccountHandler) listAllProxies(ctx context.Context) ([]service.Proxy, e
 	return out, nil
 }
 
-func (h *AccountHandler) listAccountsFiltered(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode, sortBy, sortOrder string) ([]service.Account, error) {
+func (h *AccountHandler) listAccountsFiltered(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode, sortBy, sortOrder string, driverIDs ...string) ([]service.Account, error) {
+	driverID := ""
+	if len(driverIDs) > 0 {
+		driverID = driverIDs[0]
+	}
 	page := 1
 	pageSize := dataPageCap
 	var out []service.Account
 	for {
-		items, total, err := h.adminService.ListAccounts(ctx, page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
+		items, total, err := h.listAccountsWithDriver(ctx, page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder, driverID)
 		if err != nil {
 			return nil, err
 		}
@@ -564,7 +577,7 @@ func (h *AccountHandler) resolveExportAccounts(ctx context.Context, ids []int64,
 		}
 	}
 
-	return h.listAccountsFiltered(ctx, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
+	return h.listAccountsFiltered(ctx, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder, c.Query("account_driver_id"))
 }
 
 func (h *AccountHandler) resolveExportProxies(ctx context.Context, accounts []service.Account) ([]service.Proxy, error) {
@@ -680,6 +693,15 @@ func validateDataProxy(item DataProxy) error {
 }
 
 func validateDataAccount(item DataAccount) error {
+	if err := service.ValidateAccountDriverSelection(item.AccountDriverID, item.DriverSettings); err != nil {
+		return err
+	}
+	if err := service.ValidateAccountDriverForAccount(item.AccountDriverID, item.Platform, item.Type, item.Credentials); err != nil {
+		return err
+	}
+	if err := service.ValidateAccountDriverState(&service.Account{AccountDriverID: item.AccountDriverID, Platform: item.Platform, Type: item.Type, Credentials: item.Credentials, Extra: item.Extra}); err != nil {
+		return err
+	}
 	if strings.TrimSpace(item.Name) == "" {
 		return errors.New("account name is required")
 	}

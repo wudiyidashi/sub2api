@@ -7,6 +7,7 @@ import dashboardAPI from './dashboard'
 import usersAPI from './users'
 import groupsAPI from './groups'
 import accountsAPI from './accounts'
+import accountDriversAPI from './accountDrivers'
 import proxiesAPI from './proxies'
 import redeemAPI from './redeem'
 import promoAPI from './promo'
@@ -36,6 +37,7 @@ import riskControlAPI from './riskControl'
 import adminComplianceAPI from './compliance'
 import auditAPI from './audit'
 import pluginsAPI from './plugins'
+import contentAuditAPI from './contentAudit'
 
 /**
  * Unified admin API object for convenient access
@@ -45,6 +47,7 @@ export const adminAPI = {
   users: usersAPI,
   groups: groupsAPI,
   accounts: accountsAPI,
+  accountDrivers: accountDriversAPI,
   proxies: proxiesAPI,
   redeem: redeemAPI,
   promo: promoAPI,
@@ -73,7 +76,8 @@ export const adminAPI = {
   riskControl: riskControlAPI,
   compliance: adminComplianceAPI,
   audit: auditAPI,
-  plugins: pluginsAPI
+  plugins: pluginsAPI,
+  contentAudit: contentAuditAPI
 }
 
 export {
@@ -81,6 +85,7 @@ export {
   usersAPI,
   groupsAPI,
   accountsAPI,
+  accountDriversAPI,
   proxiesAPI,
   redeemAPI,
   promoAPI,
@@ -109,7 +114,8 @@ export {
   riskControlAPI,
   adminComplianceAPI,
   auditAPI,
-  pluginsAPI
+  pluginsAPI,
+  contentAuditAPI
 }
 
 export default adminAPI

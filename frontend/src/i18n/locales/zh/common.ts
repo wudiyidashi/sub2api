@@ -212,7 +212,8 @@ export default {
     riskControl: '风控中心',
     securityAudit: '安全审计',
     contentModeration: '内容审计',
-    promptAudit: '提示词审计',
+    promptAudit: '内容审计',
+    contentAudit: '内容审计工作台',
     auditLogs: '操作日志',
   },
 

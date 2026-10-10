@@ -28,6 +28,18 @@ type CRSSyncService struct {
 	cfg                *config.Config
 }
 
+func (s *CRSSyncService) updateExistingAccount(ctx context.Context, account *Account) error {
+	if account == nil {
+		return ErrAccountNotFound
+	}
+	operationCtx, release, err := AcquireAccountDriverBoundOperation(ctx, account, "crs_sync")
+	if err != nil {
+		return err
+	}
+	defer release()
+	return s.accountRepo.Update(operationCtx, account)
+}
+
 func NewCRSSyncService(
 	accountRepo AccountRepository,
 	proxyRepo ProxyRepository,
@@ -69,6 +81,22 @@ func guardCRSShadowParentInvariant(ctx context.Context, repo AccountRepository, 
 		return fmt.Errorf("cannot change a spark-shadow parent account to %s/%s; it must stay OpenAI OAuth (delete the shadow first)", newPlatform, newType)
 	}
 	return nil
+}
+
+// Preserve an existing management binding when CRS updates by external ID.
+// Validate before mutating the loaded account, including auth-mode values that
+// the normal CRS credential projection would otherwise discard.
+func guardCRSAccountDriverInvariant(existing *Account, platform, accountType string, credentials, extra, rawCredentials map[string]any) error {
+	if existing == nil || existing.EffectiveAccountDriverID() == "native" {
+		return nil
+	}
+	candidate := *existing
+	candidate.Platform, candidate.Type = platform, accountType
+	candidate.Credentials, candidate.Extra = credentials, extra
+	if err := ValidateAccountDriverState(&candidate); err != nil {
+		return err
+	}
+	return validateAccountDriverAuthModes(rawCredentials)
 }
 
 type SyncFromCRSInput struct {
@@ -418,6 +446,12 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 			continue
 		}
 
+		if gerr := guardCRSAccountDriverInvariant(existing, PlatformAnthropic, targetType, credentials, extra, src.Credentials); gerr != nil {
+			item.Action, item.Error = "failed", gerr.Error()
+			result.Failed++
+			result.Items = append(result.Items, item)
+			continue
+		}
 		// Update existing
 		existing.Extra = extra
 		existing.Name = defaultName(src.Name, src.ID)
@@ -432,7 +466,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 		existing.Status = status
 		existing.Schedulable = src.Schedulable
 
-		if err := s.accountRepo.Update(ctx, existing); err != nil {
+		if err := s.updateExistingAccount(ctx, existing); err != nil {
 			item.Action = "failed"
 			item.Error = "update failed: " + err.Error()
 			result.Failed++
@@ -548,6 +582,12 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 			continue
 		}
 
+		if gerr := guardCRSAccountDriverInvariant(existing, PlatformAnthropic, AccountTypeAPIKey, credentials, extra, src.Credentials); gerr != nil {
+			item.Action, item.Error = "failed", gerr.Error()
+			result.Failed++
+			result.Items = append(result.Items, item)
+			continue
+		}
 		existing.Extra = extra
 		existing.Name = defaultName(src.Name, src.ID)
 		existing.Platform = PlatformAnthropic
@@ -561,7 +601,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 		existing.Status = status
 		existing.Schedulable = src.Schedulable
 
-		if err := s.accountRepo.Update(ctx, existing); err != nil {
+		if err := s.updateExistingAccount(ctx, existing); err != nil {
 			item.Action = "failed"
 			item.Error = "update failed: " + err.Error()
 			result.Failed++
@@ -698,6 +738,12 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 			continue
 		}
 
+		if gerr := guardCRSAccountDriverInvariant(existing, PlatformOpenAI, AccountTypeOAuth, credentials, extra, src.Credentials); gerr != nil {
+			item.Action, item.Error = "failed", gerr.Error()
+			result.Failed++
+			result.Items = append(result.Items, item)
+			continue
+		}
 		existing.Extra = extra
 		existing.Name = defaultName(src.Name, src.ID)
 		existing.Platform = PlatformOpenAI
@@ -711,7 +757,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 		existing.Status = status
 		existing.Schedulable = src.Schedulable
 
-		if err := s.accountRepo.Update(ctx, existing); err != nil {
+		if err := s.updateExistingAccount(ctx, existing); err != nil {
 			item.Action = "failed"
 			item.Error = "update failed: " + err.Error()
 			result.Failed++
@@ -855,6 +901,12 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 			continue
 		}
 
+		if gerr := guardCRSAccountDriverInvariant(existing, PlatformOpenAI, AccountTypeAPIKey, credentials, extra, src.Credentials); gerr != nil {
+			item.Action, item.Error = "failed", gerr.Error()
+			result.Failed++
+			result.Items = append(result.Items, item)
+			continue
+		}
 		existing.Extra = extra
 		existing.Name = defaultName(src.Name, src.ID)
 		existing.Platform = PlatformOpenAI
@@ -868,7 +920,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 		existing.Status = status
 		existing.Schedulable = src.Schedulable
 
-		if err := s.accountRepo.Update(ctx, existing); err != nil {
+		if err := s.updateExistingAccount(ctx, existing); err != nil {
 			item.Action = "failed"
 			item.Error = "update failed: " + err.Error()
 			result.Failed++
@@ -987,6 +1039,12 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 			continue
 		}
 
+		if gerr := guardCRSAccountDriverInvariant(existing, PlatformGemini, AccountTypeOAuth, credentials, extra, src.Credentials); gerr != nil {
+			item.Action, item.Error = "failed", gerr.Error()
+			result.Failed++
+			result.Items = append(result.Items, item)
+			continue
+		}
 		existing.Extra = extra
 		existing.Name = defaultName(src.Name, src.ID)
 		existing.Platform = PlatformGemini
@@ -1000,7 +1058,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 		existing.Status = mapCRSStatus(src.IsActive, src.Status)
 		existing.Schedulable = src.Schedulable
 
-		if err := s.accountRepo.Update(ctx, existing); err != nil {
+		if err := s.updateExistingAccount(ctx, existing); err != nil {
 			item.Action = "failed"
 			item.Error = "update failed: " + err.Error()
 			result.Failed++
@@ -1114,6 +1172,12 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 			continue
 		}
 
+		if gerr := guardCRSAccountDriverInvariant(existing, PlatformGemini, AccountTypeAPIKey, credentials, extra, src.Credentials); gerr != nil {
+			item.Action, item.Error = "failed", gerr.Error()
+			result.Failed++
+			result.Items = append(result.Items, item)
+			continue
+		}
 		existing.Extra = extra
 		existing.Name = defaultName(src.Name, src.ID)
 		existing.Platform = PlatformGemini
@@ -1127,7 +1191,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 		existing.Status = mapCRSStatus(src.IsActive, src.Status)
 		existing.Schedulable = src.Schedulable
 
-		if err := s.accountRepo.Update(ctx, existing); err != nil {
+		if err := s.updateExistingAccount(ctx, existing); err != nil {
 			item.Action = "failed"
 			item.Error = "update failed: " + err.Error()
 			result.Failed++

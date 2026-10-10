@@ -2292,6 +2292,9 @@ type AccountMutation struct {
 	notes                       *string
 	platform                    *string
 	_type                       *string
+	account_driver_id           *string
+	account_driver_revision     *int64
+	addaccount_driver_revision  *int64
 	credentials                 *map[string]interface{}
 	extra                       *map[string]interface{}
 	proxy_fallback_origin_id    *int64
@@ -2712,6 +2715,98 @@ func (m *AccountMutation) OldType(ctx context.Context) (v string, err error) {
 // ResetType resets all changes to the "type" field.
 func (m *AccountMutation) ResetType() {
 	m._type = nil
+}
+
+// SetAccountDriverID sets the "account_driver_id" field.
+func (m *AccountMutation) SetAccountDriverID(s string) {
+	m.account_driver_id = &s
+}
+
+// AccountDriverID returns the value of the "account_driver_id" field in the mutation.
+func (m *AccountMutation) AccountDriverID() (r string, exists bool) {
+	v := m.account_driver_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountDriverID returns the old "account_driver_id" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldAccountDriverID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountDriverID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountDriverID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountDriverID: %w", err)
+	}
+	return oldValue.AccountDriverID, nil
+}
+
+// ResetAccountDriverID resets all changes to the "account_driver_id" field.
+func (m *AccountMutation) ResetAccountDriverID() {
+	m.account_driver_id = nil
+}
+
+// SetAccountDriverRevision sets the "account_driver_revision" field.
+func (m *AccountMutation) SetAccountDriverRevision(i int64) {
+	m.account_driver_revision = &i
+	m.addaccount_driver_revision = nil
+}
+
+// AccountDriverRevision returns the value of the "account_driver_revision" field in the mutation.
+func (m *AccountMutation) AccountDriverRevision() (r int64, exists bool) {
+	v := m.account_driver_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountDriverRevision returns the old "account_driver_revision" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldAccountDriverRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountDriverRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountDriverRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountDriverRevision: %w", err)
+	}
+	return oldValue.AccountDriverRevision, nil
+}
+
+// AddAccountDriverRevision adds i to the "account_driver_revision" field.
+func (m *AccountMutation) AddAccountDriverRevision(i int64) {
+	if m.addaccount_driver_revision != nil {
+		*m.addaccount_driver_revision += i
+	} else {
+		m.addaccount_driver_revision = &i
+	}
+}
+
+// AddedAccountDriverRevision returns the value that was added to the "account_driver_revision" field in this mutation.
+func (m *AccountMutation) AddedAccountDriverRevision() (r int64, exists bool) {
+	v := m.addaccount_driver_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAccountDriverRevision resets all changes to the "account_driver_revision" field.
+func (m *AccountMutation) ResetAccountDriverRevision() {
+	m.account_driver_revision = nil
+	m.addaccount_driver_revision = nil
 }
 
 // SetCredentials sets the "credentials" field.
@@ -4138,7 +4233,7 @@ func (m *AccountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountMutation) Fields() []string {
-	fields := make([]string, 0, 31)
+	fields := make([]string, 0, 33)
 	if m.created_at != nil {
 		fields = append(fields, account.FieldCreatedAt)
 	}
@@ -4159,6 +4254,12 @@ func (m *AccountMutation) Fields() []string {
 	}
 	if m._type != nil {
 		fields = append(fields, account.FieldType)
+	}
+	if m.account_driver_id != nil {
+		fields = append(fields, account.FieldAccountDriverID)
+	}
+	if m.account_driver_revision != nil {
+		fields = append(fields, account.FieldAccountDriverRevision)
 	}
 	if m.credentials != nil {
 		fields = append(fields, account.FieldCredentials)
@@ -4254,6 +4355,10 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 		return m.Platform()
 	case account.FieldType:
 		return m.GetType()
+	case account.FieldAccountDriverID:
+		return m.AccountDriverID()
+	case account.FieldAccountDriverRevision:
+		return m.AccountDriverRevision()
 	case account.FieldCredentials:
 		return m.Credentials()
 	case account.FieldExtra:
@@ -4325,6 +4430,10 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldPlatform(ctx)
 	case account.FieldType:
 		return m.OldType(ctx)
+	case account.FieldAccountDriverID:
+		return m.OldAccountDriverID(ctx)
+	case account.FieldAccountDriverRevision:
+		return m.OldAccountDriverRevision(ctx)
 	case account.FieldCredentials:
 		return m.OldCredentials(ctx)
 	case account.FieldExtra:
@@ -4430,6 +4539,20 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetType(v)
+		return nil
+	case account.FieldAccountDriverID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountDriverID(v)
+		return nil
+	case account.FieldAccountDriverRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountDriverRevision(v)
 		return nil
 	case account.FieldCredentials:
 		v, ok := value.(map[string]interface{})
@@ -4607,6 +4730,9 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *AccountMutation) AddedFields() []string {
 	var fields []string
+	if m.addaccount_driver_revision != nil {
+		fields = append(fields, account.FieldAccountDriverRevision)
+	}
 	if m.addproxy_fallback_origin_id != nil {
 		fields = append(fields, account.FieldProxyFallbackOriginID)
 	}
@@ -4630,6 +4756,8 @@ func (m *AccountMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *AccountMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case account.FieldAccountDriverRevision:
+		return m.AddedAccountDriverRevision()
 	case account.FieldProxyFallbackOriginID:
 		return m.AddedProxyFallbackOriginID()
 	case account.FieldConcurrency:
@@ -4649,6 +4777,13 @@ func (m *AccountMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *AccountMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case account.FieldAccountDriverRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAccountDriverRevision(v)
+		return nil
 	case account.FieldProxyFallbackOriginID:
 		v, ok := value.(int64)
 		if !ok {
@@ -4836,6 +4971,12 @@ func (m *AccountMutation) ResetField(name string) error {
 		return nil
 	case account.FieldType:
 		m.ResetType()
+		return nil
+	case account.FieldAccountDriverID:
+		m.ResetAccountDriverID()
+		return nil
+	case account.FieldAccountDriverRevision:
+		m.ResetAccountDriverRevision()
 		return nil
 	case account.FieldCredentials:
 		m.ResetCredentials()

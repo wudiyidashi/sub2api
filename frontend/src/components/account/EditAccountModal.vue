@@ -5,12 +5,24 @@
     width="wide"
     @close="handleClose"
   >
+    <AccountDriverMaintenancePanel
+      v-if="account"
+      :account="account"
+      :show="show"
+      @blocked="driverMaintenanceBlocked = $event"
+      @status="emit('maintenance', $event)"
+      @updated="emit('updated', $event)"
+    />
+    <p v-if="driverMaintenanceBlocked" class="mb-4 text-sm text-amber-600 dark:text-amber-400" role="status">
+      {{ t('admin.accounts.accountDriver.maintenance.blockedHint') }}
+    </p>
     <form
       v-if="account"
       id="edit-account-form"
       @submit.prevent="handleSubmit"
       class="space-y-5"
     >
+      <fieldset :disabled="driverMaintenanceBlocked" class="space-y-5">
       <div>
         <label class="input-label">{{ t('common.name') }}</label>
         <input v-model="form.name" type="text" required class="input" data-tour="edit-account-form-name" />
@@ -25,6 +37,16 @@
         ></textarea>
         <p class="input-hint">{{ t('admin.accounts.notesHint') }}</p>
       </div>
+
+      <AccountDriverSelector
+        :model-value="account.account_driver?.id || 'native'"
+        :active="show"
+        :platform="account.platform"
+        :account-type="account.type"
+        :binding="account.account_driver"
+        @update:driver="selectedAccountDriver = $event"
+        readonly
+      />
 
       <!-- API Key fields (only for apikey type) -->
       <div v-if="account.type === 'apikey'" class="space-y-4">
@@ -1883,7 +1905,7 @@
 
       <!-- OpenAI WS Mode 三态（off/ctx_pool/passthrough） -->
       <div
-        v-if="account?.platform === 'openai' && (account?.type === 'oauth' || account?.type === 'setup-token' || account?.type === 'apikey')"
+        v-if="account?.platform === 'openai' && showWebSocketSettings && (account?.type === 'oauth' || account?.type === 'setup-token' || account?.type === 'apikey')"
         class="border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <div class="flex items-center justify-between">
@@ -1895,9 +1917,12 @@
             <p v-if="openAIWSModeHintKey" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {{ t(openAIWSModeHintKey) }}
             </p>
+            <p v-if="isCodexHTTPDriver && !enhancedWebSocketReady" class="mt-1 text-xs text-amber-600 dark:text-amber-400" role="status" data-testid="enhanced-ws-unavailable">
+              {{ t('admin.accounts.accountDriver.websocketUnavailableHint') }}
+            </p>
           </div>
           <div class="w-52">
-            <Select v-model="openaiResponsesWebSocketV2Mode" data-testid="edit-openai-ws-mode-select" :options="openAIWSModeOptions" />
+            <Select v-model="openaiResponsesWebSocketV2Mode" data-testid="edit-openai-ws-mode-select" :options="openAIWSModeOptions" :disabled="isCodexHTTPDriver && !enhancedWebSocketReady" />
           </div>
         </div>
       </div>
@@ -3071,6 +3096,7 @@
         data-tour="account-form-groups"
       />
 
+      </fieldset>
     </form>
 
     <template #footer>
@@ -3081,7 +3107,7 @@
         <button
           type="submit"
           form="edit-account-form"
-          :disabled="submitting"
+          :disabled="submitting || driverMaintenanceBlocked"
           class="btn btn-primary"
           data-tour="account-form-submit"
         >
@@ -3147,6 +3173,10 @@ import type {
   OpenCodeGoUsageWindow
 } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import AccountDriverSelector from '@/features/account-drivers/AccountDriverSelector.vue'
+import AccountDriverMaintenancePanel from '@/features/account-drivers/AccountDriverMaintenancePanel.vue'
+import { CODEX_HTTP_DRIVER_ID } from '@/features/account-drivers/useAccountDrivers'
+import type { AccountDriver, AccountDriverBinding, AccountDriverMaintenanceStatus } from '@/features/account-drivers/types'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
@@ -3237,9 +3267,17 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+const selectedAccountDriver = ref<AccountDriver | AccountDriverBinding>()
+const driverMaintenanceBlocked = ref(false)
+const isCodexHTTPDriver = computed(() => props.account?.account_driver?.id === CODEX_HTTP_DRIVER_ID)
+const currentAccountDriver = computed(() => selectedAccountDriver.value?.id === props.account?.account_driver?.id
+  ? selectedAccountDriver.value : props.account?.account_driver)
+const enhancedWebSocketReady = computed(() => currentAccountDriver.value?.id === CODEX_HTTP_DRIVER_ID &&
+  currentAccountDriver.value.available && currentAccountDriver.value.transport_protocols?.includes('websocket') === true)
 const emit = defineEmits<{
   close: []
   updated: [account: Account]
+  maintenance: [status: AccountDriverMaintenanceStatus | null]
 }>()
 
 const { t } = useI18n()
@@ -3794,6 +3832,7 @@ const openaiResponsesWebSocketV2Mode = computed({
     return openaiOAuthResponsesWebSocketV2Mode.value
   },
   set: (mode: OpenAIWSMode) => {
+    if (isCodexHTTPDriver.value && !enhancedWebSocketReady.value) return
     if (props.account?.type === 'apikey') {
       openaiAPIKeyResponsesWebSocketV2Mode.value = mode
       return
@@ -3801,6 +3840,9 @@ const openaiResponsesWebSocketV2Mode = computed({
     openaiOAuthResponsesWebSocketV2Mode.value = mode
   }
 })
+const showWebSocketSettings = computed(() => !isCodexHTTPDriver.value ||
+  currentAccountDriver.value?.transport_protocols?.includes('websocket') === true ||
+  openaiResponsesWebSocketV2Mode.value !== OPENAI_WS_MODE_OFF)
 const openAIWSModeHintKey = computed(() =>
   resolveOpenAIWSModeHintKey(openaiResponsesWebSocketV2Mode.value)
 )
@@ -5140,6 +5182,7 @@ const persistGrokMediaEligibility = async (accountID: number, updatedAccount: Ac
 }
 
 const submitUpdateAccount = async (accountID: number, updatePayload: Record<string, unknown>) => {
+  if (driverMaintenanceBlocked.value) { appStore.showError(t('admin.accounts.accountDriver.maintenance.blockedHint')); return }
   submitting.value = true
   try {
     let updatedAccount = await adminAPI.accounts.update(accountID, withAntigravityConfirmFlag(updatePayload))
@@ -5166,6 +5209,7 @@ const submitUpdateAccount = async (accountID: number, updatePayload: Record<stri
 
 const handleSubmit = async () => {
   if (!props.account) return
+  if (driverMaintenanceBlocked.value) { appStore.showError(t('admin.accounts.accountDriver.maintenance.blockedHint')); return }
   const accountID = props.account.id
 
   if (form.status !== 'active' && form.status !== 'inactive' && form.status !== 'error') {
@@ -5702,15 +5746,18 @@ const handleSubmit = async () => {
       const currentExtra = (props.account.extra as Record<string, unknown>) || {}
       const newExtra: Record<string, unknown> = { ...currentExtra }
       const hadCodexCLIOnlyEnabled = currentExtra.codex_cli_only === true
-      if (props.account.type === 'oauth' || props.account.type === 'setup-token') {
-        newExtra.openai_oauth_responses_websockets_v2_mode = openaiOAuthResponsesWebSocketV2Mode.value
-        newExtra.openai_oauth_responses_websockets_v2_enabled = isOpenAIWSModeEnabled(openaiOAuthResponsesWebSocketV2Mode.value)
+      if ((props.account.type === 'oauth' || props.account.type === 'setup-token') && (!isCodexHTTPDriver.value || enhancedWebSocketReady.value)) {
+        const wsMode = openaiOAuthResponsesWebSocketV2Mode.value
+        newExtra.openai_oauth_responses_websockets_v2_mode = wsMode
+        newExtra.openai_oauth_responses_websockets_v2_enabled = isOpenAIWSModeEnabled(wsMode)
       } else if (props.account.type === 'apikey') {
         newExtra.openai_apikey_responses_websockets_v2_mode = openaiAPIKeyResponsesWebSocketV2Mode.value
         newExtra.openai_apikey_responses_websockets_v2_enabled = isOpenAIWSModeEnabled(openaiAPIKeyResponsesWebSocketV2Mode.value)
       }
-      delete newExtra.responses_websockets_v2_enabled
-      delete newExtra.openai_ws_enabled
+      if (!isCodexHTTPDriver.value || enhancedWebSocketReady.value) {
+        delete newExtra.responses_websockets_v2_enabled
+        delete newExtra.openai_ws_enabled
+      }
       if (openaiPassthroughEnabled.value) {
         newExtra.openai_passthrough = true
       } else {

@@ -119,6 +119,41 @@ func (_u *AccountUpdate) SetNillableType(v *string) *AccountUpdate {
 	return _u
 }
 
+// SetAccountDriverID sets the "account_driver_id" field.
+func (_u *AccountUpdate) SetAccountDriverID(v string) *AccountUpdate {
+	_u.mutation.SetAccountDriverID(v)
+	return _u
+}
+
+// SetNillableAccountDriverID sets the "account_driver_id" field if the given value is not nil.
+func (_u *AccountUpdate) SetNillableAccountDriverID(v *string) *AccountUpdate {
+	if v != nil {
+		_u.SetAccountDriverID(*v)
+	}
+	return _u
+}
+
+// SetAccountDriverRevision sets the "account_driver_revision" field.
+func (_u *AccountUpdate) SetAccountDriverRevision(v int64) *AccountUpdate {
+	_u.mutation.ResetAccountDriverRevision()
+	_u.mutation.SetAccountDriverRevision(v)
+	return _u
+}
+
+// SetNillableAccountDriverRevision sets the "account_driver_revision" field if the given value is not nil.
+func (_u *AccountUpdate) SetNillableAccountDriverRevision(v *int64) *AccountUpdate {
+	if v != nil {
+		_u.SetAccountDriverRevision(*v)
+	}
+	return _u
+}
+
+// AddAccountDriverRevision adds value to the "account_driver_revision" field.
+func (_u *AccountUpdate) AddAccountDriverRevision(v int64) *AccountUpdate {
+	_u.mutation.AddAccountDriverRevision(v)
+	return _u
+}
+
 // SetCredentials sets the "credentials" field.
 func (_u *AccountUpdate) SetCredentials(v map[string]interface{}) *AccountUpdate {
 	_u.mutation.SetCredentials(v)
@@ -772,6 +807,16 @@ func (_u *AccountUpdate) check() error {
 			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "Account.type": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.AccountDriverID(); ok {
+		if err := account.AccountDriverIDValidator(v); err != nil {
+			return &ValidationError{Name: "account_driver_id", err: fmt.Errorf(`ent: validator failed for field "Account.account_driver_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.AccountDriverRevision(); ok {
+		if err := account.AccountDriverRevisionValidator(v); err != nil {
+			return &ValidationError{Name: "account_driver_revision", err: fmt.Errorf(`ent: validator failed for field "Account.account_driver_revision": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := account.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Account.status": %w`, err)}
@@ -825,6 +870,15 @@ func (_u *AccountUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.GetType(); ok {
 		_spec.SetField(account.FieldType, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.AccountDriverID(); ok {
+		_spec.SetField(account.FieldAccountDriverID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.AccountDriverRevision(); ok {
+		_spec.SetField(account.FieldAccountDriverRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedAccountDriverRevision(); ok {
+		_spec.AddField(account.FieldAccountDriverRevision, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.Credentials(); ok {
 		_spec.SetField(account.FieldCredentials, field.TypeJSON, value)
@@ -1256,6 +1310,41 @@ func (_u *AccountUpdateOne) SetNillableType(v *string) *AccountUpdateOne {
 	if v != nil {
 		_u.SetType(*v)
 	}
+	return _u
+}
+
+// SetAccountDriverID sets the "account_driver_id" field.
+func (_u *AccountUpdateOne) SetAccountDriverID(v string) *AccountUpdateOne {
+	_u.mutation.SetAccountDriverID(v)
+	return _u
+}
+
+// SetNillableAccountDriverID sets the "account_driver_id" field if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillableAccountDriverID(v *string) *AccountUpdateOne {
+	if v != nil {
+		_u.SetAccountDriverID(*v)
+	}
+	return _u
+}
+
+// SetAccountDriverRevision sets the "account_driver_revision" field.
+func (_u *AccountUpdateOne) SetAccountDriverRevision(v int64) *AccountUpdateOne {
+	_u.mutation.ResetAccountDriverRevision()
+	_u.mutation.SetAccountDriverRevision(v)
+	return _u
+}
+
+// SetNillableAccountDriverRevision sets the "account_driver_revision" field if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillableAccountDriverRevision(v *int64) *AccountUpdateOne {
+	if v != nil {
+		_u.SetAccountDriverRevision(*v)
+	}
+	return _u
+}
+
+// AddAccountDriverRevision adds value to the "account_driver_revision" field.
+func (_u *AccountUpdateOne) AddAccountDriverRevision(v int64) *AccountUpdateOne {
+	_u.mutation.AddAccountDriverRevision(v)
 	return _u
 }
 
@@ -1925,6 +2014,16 @@ func (_u *AccountUpdateOne) check() error {
 			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "Account.type": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.AccountDriverID(); ok {
+		if err := account.AccountDriverIDValidator(v); err != nil {
+			return &ValidationError{Name: "account_driver_id", err: fmt.Errorf(`ent: validator failed for field "Account.account_driver_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.AccountDriverRevision(); ok {
+		if err := account.AccountDriverRevisionValidator(v); err != nil {
+			return &ValidationError{Name: "account_driver_revision", err: fmt.Errorf(`ent: validator failed for field "Account.account_driver_revision": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := account.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Account.status": %w`, err)}
@@ -1995,6 +2094,15 @@ func (_u *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err er
 	}
 	if value, ok := _u.mutation.GetType(); ok {
 		_spec.SetField(account.FieldType, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.AccountDriverID(); ok {
+		_spec.SetField(account.FieldAccountDriverID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.AccountDriverRevision(); ok {
+		_spec.SetField(account.FieldAccountDriverRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedAccountDriverRevision(); ok {
+		_spec.AddField(account.FieldAccountDriverRevision, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.Credentials(); ok {
 		_spec.SetField(account.FieldCredentials, field.TypeJSON, value)

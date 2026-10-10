@@ -80,6 +80,9 @@ func (e *openAIWSFallbackError) Unwrap() error {
 }
 
 func wrapOpenAIWSFallback(reason string, err error) error {
+	if managedWSReplayForbidden(err) {
+		return err
+	}
 	return &openAIWSFallbackError{Reason: strings.TrimSpace(reason), Err: err}
 }
 
@@ -161,6 +164,9 @@ func wrapOpenAIWSIngressTurnError(stage string, cause error, wroteDownstream boo
 }
 
 func isOpenAIWSIngressTurnRetryable(err error) bool {
+	if managedWSReplayForbidden(err) {
+		return false
+	}
 	var turnErr *openAIWSIngressTurnError
 	if !errors.As(err, &turnErr) || turnErr == nil {
 		return false
@@ -276,6 +282,7 @@ func (s *OpenAIGatewayService) getOpenAIWSConnPool() *openAIWSConnPool {
 	s.openaiWSPoolOnce.Do(func() {
 		if s.openaiWSPool == nil {
 			s.openaiWSPool = newOpenAIWSConnPool(s.cfg)
+			s.openaiWSPool.clientDialer = s.managedWSDialer(s.openaiWSPool.clientDialer)
 		}
 	})
 	return s.openaiWSPool
@@ -289,6 +296,7 @@ func (s *OpenAIGatewayService) getOpenAIWSPassthroughDialer() openAIWSClientDial
 		if s.openaiWSPassthroughDialer == nil {
 			s.openaiWSPassthroughDialer = newDefaultOpenAIWSClientDialer()
 		}
+		s.openaiWSPassthroughDialer = s.managedWSDialer(s.openaiWSPassthroughDialer)
 	})
 	return s.openaiWSPassthroughDialer
 }
@@ -330,6 +338,14 @@ func (s *OpenAIGatewayService) getOpenAIWSStateStore() OpenAIWSStateStore {
 		}
 	})
 	return s.openaiWSStateStore
+}
+
+func (s *OpenAIGatewayService) accountDriverGenerationCanContinue() func(uint64) bool {
+	if s == nil || s.pluginManager == nil || s.pluginManager.accountDriverManager == nil {
+		return nil
+	}
+	manager := s.pluginManager.accountDriverManager
+	return manager.CanContinueGeneration
 }
 
 func (s *OpenAIGatewayService) openAIWSResponseStickyTTL() time.Duration {

@@ -10,7 +10,7 @@
 
 Report them privately through GitHub's private vulnerability reporting:
 
-**[Report a vulnerability](https://github.com/Wei-Shaw/sub2api/security/advisories/new)**
+**[Report a vulnerability](https://github.com/wudiyidashi/sub2api/security/advisories/new)**
 
 (Repository → **Security** tab → **Report a vulnerability**.) Only the maintainers can see the report, and the advisory becomes the place to discuss, fix, and eventually publish the issue.
 
@@ -62,7 +62,7 @@ Please keep details private until the advisory is published. This is a volunteer
 
 请使用 GitHub 私密漏洞报告功能提交：
 
-**[提交漏洞报告](https://github.com/Wei-Shaw/sub2api/security/advisories/new)**
+**[提交漏洞报告](https://github.com/wudiyidashi/sub2api/security/advisories/new)**
 
 （仓库 → **Security** 标签页 → **Report a vulnerability**。）报告仅维护者可见，后续的讨论、修复与公告发布都在该安全公告中进行。
 

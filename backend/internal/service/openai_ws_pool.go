@@ -68,9 +68,15 @@ func (e *openAIWSDialError) Unwrap() error {
 }
 
 type openAIWSAcquireRequest struct {
-	Account *Account
-	WSURL   string
-	Headers http.Header
+	ManagedScope      string
+	ManagedGeneration uint64
+	// ManagedGenerationCanContinue validates a preferred connection's runtime
+	// generation after a hot upgrade. Fresh dials always use the active
+	// generation above; only an existing continuation may use a retired one.
+	ManagedGenerationCanContinue func(uint64) bool
+	Account                      *Account
+	WSURL                        string
+	Headers                      http.Header
 	// HeadersFactory is evaluated inside dialConn. It exists so credentials
 	// whose authorization is per-dial (Agent Identity) are never cached in
 	// lastAcquire or delayed prewarm state.
@@ -84,6 +90,13 @@ type openAIWSAcquireRequest struct {
 }
 
 type openAIWSHandshakeCompatibilityKey struct {
+	managedScope        string
+	managedAuth         string
+	managedDriver       string
+	managedRevision     int64
+	managedGeneration   uint64
+	managedURL          string
+	managedProxy        string
 	betaFeatures        string
 	codexInstallationID string
 	sessionIDHyphen     string
@@ -608,7 +621,14 @@ func (c *openAIWSConn) readMessageWithTimeout(timeout time.Duration) ([]byte, er
 	return c.readMessageWithContextTimeout(context.Background(), timeout)
 }
 
-func (c *openAIWSConn) readMessageWithContextTimeout(parent context.Context, timeout time.Duration) ([]byte, error) {
+func (c *openAIWSConn) readMessageWithContextTimeout(parent context.Context, timeout time.Duration) (message []byte, readErr error) {
+	defer func() {
+		if readErr != nil && c != nil {
+			if facts, ok := c.ws.(interface{ MayHaveSentBusiness() bool }); ok && facts.MayHaveSentBusiness() && !managedWSMayHaveBeenSent(readErr) {
+				readErr = &managedWSMaySentError{readErr}
+			}
+		}
+	}()
 	if c == nil {
 		return nil, errOpenAIWSConnClosed
 	}
@@ -770,6 +790,26 @@ func (c *openAIWSConn) handshakeHeader(name string) string {
 
 func (c *openAIWSConn) matchesHandshakeCompatibility(compatibility openAIWSHandshakeCompatibilityKey) bool {
 	return c != nil && c.handshakeCompatibility == compatibility
+}
+
+func (c *openAIWSConn) matchesHandshakeCompatibilityForRequest(compatibility openAIWSHandshakeCompatibilityKey, req openAIWSAcquireRequest) bool {
+	if c == nil {
+		return false
+	}
+	if c.handshakeCompatibility == compatibility {
+		return true
+	}
+	// A retired generation is valid only for the already selected preferred
+	// socket. All other handshake fields must still match exactly.
+	if req.ManagedGenerationCanContinue == nil || c.handshakeCompatibility.managedDriver == "" {
+		return false
+	}
+	continued := compatibility
+	continued.managedGeneration = c.handshakeCompatibility.managedGeneration
+	if c.handshakeCompatibility != continued {
+		return false
+	}
+	return req.ManagedGenerationCanContinue(c.handshakeCompatibility.managedGeneration)
 }
 
 func (c *openAIWSConn) matchesRoutingAffinity(routingAffinity string) bool {
@@ -1112,6 +1152,9 @@ func (p *openAIWSConnPool) Acquire(ctx context.Context, req openAIWSAcquireReque
 	}
 	queueWait := &openAIWSAcquireQueueWait{}
 	lease, err := p.acquire(ctx, cloneOpenAIWSAcquireRequest(req), 0, queueWait)
+	if usesCodexHTTPDriver(req.Account) && req.ForcePreferredConn && errors.Is(err, errOpenAIWSPreferredConnUnavailable) {
+		err = &managedWSContinuationError{err}
+	}
 	if lease != nil && queueWait.rewoken {
 		// 广播重选经 tryAcquire 拿令牌，不像排队分支那样在取得令牌后检查取消，
 		// 这里补上复查：上下文已取消就归还令牌并按取消返回。
@@ -1145,7 +1188,7 @@ func (p *openAIWSConnPool) acquire(ctx context.Context, req openAIWSAcquireReque
 
 retryAcquire:
 	accountID := req.Account.ID
-	compatibility := normalizeOpenAIWSHandshakeCompatibility(req.Account, req.Headers)
+	compatibility := normalizeManagedWSCompatibility(req)
 	routingAffinity := normalizeOpenAIWSRoutingAffinity(req.Headers)
 	effectiveMaxConns := p.effectiveMaxConnsByAccount(req.Account)
 	if effectiveMaxConns <= 0 {
@@ -1174,7 +1217,7 @@ retryAcquire:
 				return nil, errOpenAIWSPreferredConnUnavailable
 			}
 			preferredConn, ok := ap.conns[preferredConnID]
-			if !ok || !preferredConn.matchesHandshakeCompatibility(compatibility) {
+			if !ok || !preferredConn.matchesHandshakeCompatibilityForRequest(compatibility, req) {
 				p.recordConnPickDuration(time.Since(pickStartedAt))
 				ap.mu.Unlock()
 				closeOpenAIWSConns(evicted)
@@ -2126,6 +2169,7 @@ func (p *openAIWSConnPool) dialConn(ctx context.Context, req openAIWSAcquireRequ
 			return nil, err
 		}
 	}
+	ctx = withManagedAccountWSBinding(ctx, req.Account, req.ManagedScope)
 	conn, status, handshakeHeaders, err := p.clientDialer.Dial(ctx, req.WSURL, headers, req.ProxyURL)
 	if err != nil {
 		var handshakeErr *openAIWSHandshakeError
@@ -2152,7 +2196,7 @@ func (p *openAIWSConnPool) dialConn(ctx context.Context, req openAIWSAcquireRequ
 	accountID := req.Account.ID
 	evict := func() { p.evictConn(accountID, id) }
 	pooledConn.onPeerClosed.Store(&evict)
-	pooledConn.handshakeCompatibility = normalizeOpenAIWSHandshakeCompatibility(req.Account, req.Headers)
+	pooledConn.handshakeCompatibility = normalizeManagedWSCompatibility(req)
 	pooledConn.routingAffinity = normalizeOpenAIWSRoutingAffinity(req.Headers)
 	return pooledConn, nil
 }
@@ -2333,7 +2377,7 @@ func cloneOpenAIWSAcquireRequestPtr(req *openAIWSAcquireRequest) *openAIWSAcquir
 func sameOpenAIWSPrewarmTarget(a, b openAIWSAcquireRequest) bool {
 	return stringsTrim(a.WSURL) == stringsTrim(b.WSURL) &&
 		stringsTrim(a.ProxyURL) == stringsTrim(b.ProxyURL) &&
-		normalizeOpenAIWSHandshakeCompatibility(a.Account, a.Headers) == normalizeOpenAIWSHandshakeCompatibility(b.Account, b.Headers)
+		normalizeManagedWSCompatibility(a) == normalizeManagedWSCompatibility(b)
 }
 
 func normalizeOpenAIWSBetaFeatures(headers http.Header) string {

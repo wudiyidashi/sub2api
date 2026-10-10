@@ -15,6 +15,8 @@ export interface OpsRequestDetailsPreset {
   sort?: OpsRequestDetailsParams['sort']
   min_duration_ms?: number
   max_duration_ms?: number
+  request_id?: string
+  q?: string
 }
 
 interface Props {
@@ -89,6 +91,8 @@ const fetchData = async () => {
 
     if (typeof props.preset.min_duration_ms === 'number') params.min_duration_ms = props.preset.min_duration_ms
     if (typeof props.preset.max_duration_ms === 'number') params.max_duration_ms = props.preset.max_duration_ms
+    if (props.preset.request_id) params.request_id = props.preset.request_id
+    if (props.preset.q) params.q = props.preset.q
 
     const res = await opsAPI.listRequestDetails(params)
     items.value = res.items || []
@@ -123,7 +127,9 @@ watch(
     props.preset.kind,
     props.preset.sort,
     props.preset.min_duration_ms,
-    props.preset.max_duration_ms
+    props.preset.max_duration_ms,
+    props.preset.request_id,
+    props.preset.q
   ],
   () => {
     if (!props.modelValue) return

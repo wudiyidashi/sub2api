@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sub2api · 二次元控制台</title>
+<style>
+  :root{
+    --pink:#ff85a2; --pink-deep:#f65d83; --pink-soft:#ffe3ec; --pink-bg:#fff5f8;
+    --sky:#7eb6ff; --sky-soft:#e3f0ff;
+    --violet:#b79cff; --violet-deep:#8e6cf0; --violet-soft:#f1ebff;
+    --lemon:#ffd66e; --mint:#7fe0c3;
+    --ink:#4a3a52; --ink-soft:#8a7a95; --ink-faint:#bfaecc;
+    --card:#ffffff; --line:#ffd9e4;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:
+      radial-gradient(circle at 15% 20%, #ffe9f2 0, transparent 40%),
+      radial-gradient(circle at 85% 10%, #e9e2ff 0, transparent 45%),
+      radial-gradient(circle at 80% 90%, #dff1ff 0, transparent 40%),
+      #fdf6fa;
+    color:var(--ink); min-height:100vh; overflow-x:hidden;
+  }
+  ::selection{background:var(--pink-soft)}
+
+  /* ---------- 飘落的樱花瓣 ---------- */
+  .petal{position:fixed; top:-24px; border-radius:80% 0 80% 0; background:linear-gradient(135deg,#ffc9d9,#ff9fbc);
+    opacity:.75; pointer-events:none; z-index:1; animation:fall linear infinite;}
+  @keyframes fall{
+    0%{transform:translate(0,-24px) rotate(0deg)}
+    100%{transform:translate(-120px,108vh) rotate(340deg)}
+  }
+
+  /* ---------- 星星闪烁 ---------- */
+  .sparkle{position:absolute; pointer-events:none; animation:twinkle 2.2s ease-in-out infinite;}
+  @keyframes twinkle{0%,100%{opacity:.25; transform:scale(.8) rotate(0deg)}50%{opacity:1; transform:scale(1.15) rotate(20deg)}}
+
+  .layout{position:relative; z-index:2; display:grid; grid-template-columns:232px 1fr; min-height:100vh;}
+
+  /* ---------- 侧边栏 ---------- */
+  .side{background:rgba(255,255,255,.72); backdrop-filter:blur(14px);
+    border-right:2px solid var(--pink-soft); padding:22px 14px; display:flex; flex-direction:column; gap:6px;}
+  .logo{display:flex; align-items:center; gap:10px; padding:2px 8px 18px;}
+  .logo-mark{width:40px; height:40px; border-radius:14px; background:linear-gradient(135deg,var(--pink),var(--violet));
+    display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:18px;
+    box-shadow:0 6px 16px rgba(246,93,131,.35); transform:rotate(-6deg);}
+  .logo b{font-size:17px; letter-spacing:.5px}
+  .logo small{display:block; font-size:10px; color:var(--ink-faint); font-weight:400; letter-spacing:2px}
+  .nav-item{display:flex; align-items:center; gap:11px; padding:11px 14px; border-radius:14px;
+    font-size:14px; color:var(--ink-soft); cursor:pointer; transition:.18s; border:2px solid transparent;}
+  .nav-item svg{width:19px; height:19px; flex:none}
+  .nav-item:hover{background:var(--pink-soft); color:var(--pink-deep); transform:translateX(3px)}
+  .nav-item.active{background:linear-gradient(120deg,var(--pink-soft),var(--violet-soft));
+    border-color:var(--line); color:var(--pink-deep); font-weight:600;}
+  .nav-item .tag{margin-left:auto; font-size:10px; background:var(--pink); color:#fff; border-radius:99px; padding:1px 7px;}
+  .side-mascot{margin-top:auto; background:linear-gradient(150deg,#fff,#fff0f5); border:2px dashed var(--line);
+    border-radius:18px; padding:14px 12px; text-align:center;}
+  .side-mascot p{font-size:12px; color:var(--ink-soft); margin-top:8px; line-height:1.5}
+  .side-mascot b{color:var(--pink-deep)}
+
+  /* ---------- 主区域 ---------- */
+  .main{padding:26px 30px 40px;}
+  .topbar{display:flex; align-items:center; gap:14px; margin-bottom:22px;}
+  .search{flex:1; max-width:380px; display:flex; align-items:center; gap:8px; background:var(--card);
+    border:2px solid var(--pink-soft); border-radius:99px; padding:9px 16px; font-size:13px; color:var(--ink-faint);}
+  .top-pill{background:var(--card); border:2px solid var(--pink-soft); border-radius:99px; padding:8px 16px;
+    font-size:13px; color:var(--ink-soft); display:flex; align-items:center; gap:7px;}
+  .top-pill .dot{width:8px; height:8px; border-radius:50%; background:var(--mint); box-shadow:0 0 0 3px #dffaf1;}
+  .btn-candy{margin-left:auto; background:linear-gradient(120deg,var(--pink),var(--violet));
+    color:#fff; border:none; border-radius:99px; padding:10px 22px; font-size:14px; font-weight:600; cursor:pointer;
+    box-shadow:0 6px 16px rgba(246,93,131,.35); transition:.18s; font-family:inherit;}
+  .btn-candy:hover{transform:translateY(-2px) scale(1.03); box-shadow:0 10px 22px rgba(246,93,131,.45);}
+  .avatar{width:42px; height:42px; border-radius:50%; border:3px solid #fff; outline:2px solid var(--line);
+    background:linear-gradient(135deg,#ffd9e4,#d9ccff); display:flex; align-items:center; justify-content:center; font-size:18px;}
+
+  /* ---------- 欢迎横幅 ---------- */
+  .banner{position:relative; background:linear-gradient(115deg,#fff 30%,#ffeef4 60%,#efe9ff);
+    border:2px solid var(--line); border-radius:26px; padding:26px 30px; display:flex; align-items:center; gap:24px;
+    overflow:hidden; margin-bottom:22px;}
+  .banner::after{content:""; position:absolute; right:-40px; top:-40px; width:180px; height:180px; border-radius:50%;
+    background:radial-gradient(circle,#ffe3ec,transparent 70%);}
+  .banner h1{font-size:24px; font-weight:700;}
+  .banner h1 em{font-style:normal; background:linear-gradient(120deg,var(--pink-deep),var(--violet-deep));
+    -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .banner .sub{margin-top:6px; font-size:13px; color:var(--ink-soft);}
+  .banner .sub b{color:var(--pink-deep)}
+  .banner-actions{margin-top:16px; display:flex; gap:10px;}
+  .chip-btn{border:2px solid var(--line); background:#fff; color:var(--ink-soft); border-radius:99px;
+    padding:7px 16px; font-size:13px; cursor:pointer; transition:.15s; font-family:inherit;}
+  .chip-btn:hover{border-color:var(--pink); color:var(--pink-deep); transform:translateY(-2px);}
+  .chip-btn.primary{background:var(--pink-deep); border-color:var(--pink-deep); color:#fff; font-weight:600;}
+  .mascot-wrap{position:relative; margin-left:auto; flex:none;}
+  .bubble{position:absolute; left:-150px; top:-8px; background:#fff; border:2px solid var(--line);
+    border-radius:16px 16px 4px 16px; padding:8px 14px; font-size:12px; color:var(--pink-deep); font-weight:600;
+    box-shadow:0 6px 14px rgba(246,93,131,.15); animation:bob 3s ease-in-out infinite;}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+
+  /* ---------- 数据卡片 ---------- */
+  .stats{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; margin-bottom:22px;}
+  .stat{position:relative; background:var(--card); border:2px solid var(--pink-soft); border-radius:20px;
+    padding:18px 18px 16px; transition:.2s; overflow:hidden;}
+  .stat:hover{transform:translateY(-4px); border-color:var(--line); box-shadow:0 12px 26px rgba(246,93,131,.14);}
+  .stat .icon{width:40px; height:40px; border-radius:13px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;}
+  .stat .icon svg{width:21px; height:21px;}
+  .stat .label{font-size:12px; color:var(--ink-soft);}
+  .stat .num{font-size:26px; font-weight:800; margin-top:3px; letter-spacing:.5px;}
+  .stat .delta{font-size:11px; margin-top:5px; display:inline-flex; align-items:center; gap:4px;
+    border-radius:99px; padding:2px 9px;}
+  .up{color:#e2527c; background:var(--pink-soft);}
+  .down{color:#3fae8c; background:#dcf7ee;}
+  .s-pink .icon{background:var(--pink-soft);} .s-sky .icon{background:var(--sky-soft);}
+  .s-violet .icon{background:var(--violet-soft);} .s-lemon .icon{background:#fff3d6;}
+
+  /* ---------- 内容网格 ---------- */
+  .grid{display:grid; grid-template-columns:1.9fr 1fr; gap:16px;}
+  .panel{background:var(--card); border:2px solid var(--pink-soft); border-radius:22px; padding:20px 22px;}
+  .panel-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
+  .panel-head h3{font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px;}
+  .panel-head h3::before{content:""; width:8px; height:18px; border-radius:99px;
+    background:linear-gradient(180deg,var(--pink),var(--violet));}
+  .panel-head .more{font-size:12px; color:var(--ink-faint); cursor:pointer;}
+  .panel-head .more:hover{color:var(--pink-deep)}
+
+  .seg{display:flex; gap:6px; background:var(--pink-bg); border-radius:99px; padding:3px;}
+  .seg span{font-size:11px; padding:4px 12px; border-radius:99px; color:var(--ink-soft); cursor:pointer;}
+  .seg span.on{background:#fff; color:var(--pink-deep); font-weight:600; box-shadow:0 2px 6px rgba(246,93,131,.18);}
+
+  /* ---------- Key 列表 ---------- */
+  .key-row{display:grid; grid-template-columns:1.3fr 1.1fr .8fr .7fr; align-items:center; gap:10px;
+    padding:13px 6px; border-bottom:2px dashed var(--pink-soft); font-size:13px;}
+  .key-row:last-child{border-bottom:none}
+  .key-row.head{font-size:11px; color:var(--ink-faint); border-bottom:2px solid var(--pink-soft); padding-bottom:9px;}
+  .key-name{display:flex; align-items:center; gap:10px; font-weight:600;}
+  .key-name .kicon{width:32px; height:32px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:15px; flex:none;}
+  .key-name small{display:block; font-weight:400; color:var(--ink-faint); font-size:11px; margin-top:1px;}
+  .mono{font-family:"JetBrains Mono",Consolas,monospace; color:var(--ink-soft); font-size:12px;}
+  .badge{font-size:11px; border-radius:99px; padding:3px 11px; font-weight:600; width:max-content;}
+  .b-ok{color:#2f9d7c; background:#dcf7ee;}
+  .b-warn{color:#c98a12; background:#fff3d6;}
+  .b-off{color:var(--ink-faint); background:#f3eef7;}
+  .quota-bar{width:90px; height:8px; border-radius:99px; background:#f6e9f0; overflow:hidden;}
+  .quota-bar i{display:block; height:100%; border-radius:99px;}
+
+  /* ---------- 右栏 ---------- */
+  .fortune{text-align:center; background:linear-gradient(160deg,#fff,#f5f0ff); border:2px solid var(--violet-soft);}
+  .omikuji{width:74px; height:74px; margin:4px auto 10px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#fff,#efe6ff); border:3px solid var(--violet-soft);
+    display:flex; align-items:center; justify-content:center; font-size:34px;
+    animation:bob 3.4s ease-in-out infinite;}
+  .fortune h4{font-size:16px; color:var(--violet-deep); margin-bottom:4px;}
+  .fortune .luck{font-size:12px; color:var(--ink-soft); line-height:1.9;}
+  .fortune .luck b{color:var(--pink-deep)}
+  .lvl{margin-top:14px; text-align:left; background:#fff; border:2px dashed var(--violet-soft); border-radius:16px; padding:12px 14px;}
+  .lvl .row{display:flex; justify-content:space-between; font-size:12px; color:var(--ink-soft); margin-bottom:7px;}
+  .lvl .row b{color:var(--violet-deep); font-size:13px;}
+  .exp{height:12px; border-radius:99px; background:#f2ecfc; overflow:hidden; position:relative;}
+  .exp i{display:block; height:100%; width:68%; border-radius:99px;
+    background:repeating-linear-gradient(-45deg,var(--violet) 0 10px,var(--pink) 10px 20px);}
+
+  .notice-item{display:flex; gap:10px; padding:10px 2px; border-bottom:2px dashed var(--pink-soft); font-size:12.5px; line-height:1.6;}
+  .notice-item:last-child{border:none}
+  .notice-item .n-tag{flex:none; font-size:10px; font-weight:700; border-radius:8px; padding:2px 7px; height:max-content; margin-top:1px;}
+  .n-new{background:var(--pink-soft); color:var(--pink-deep);}
+  .n-up{background:var(--sky-soft); color:#3c7fd4;}
+  .notice-item p{color:var(--ink-soft);}
+  .notice-item time{display:block; font-size:10.5px; color:var(--ink-faint); margin-top:2px;}
+
+  @media (max-width:1080px){
+    .stats{grid-template-columns:repeat(2,1fr)} .grid{grid-template-columns:1fr}
+    .layout{grid-template-columns:78px 1fr} .side .txt,.logo div,.side-mascot p{display:none}
+    .nav-item{justify-content:center} .nav-item .tag{display:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- 樱花瓣 -->
+<div class="petal" style="left:8%;  width:14px;height:14px; animation-duration:11s;"></div>
+<div class="petal" style="left:22%; width:10px;height:10px; animation-duration:14s; animation-delay:2s;"></div>
+<div class="petal" style="left:47%; width:12px;height:12px; animation-duration:12s; animation-delay:5s;"></div>
+<div class="petal" style="left:66%; width:9px; height:9px;  animation-duration:16s; animation-delay:1s;"></div>
+<div class="petal" style="left:83%; width:13px;height:13px; animation-duration:13s; animation-delay:4s;"></div>
+<div class="petal" style="left:93%; width:10px;height:10px; animation-duration:15s; animation-delay:7s;"></div>
+
+<div class="layout">
+
+  <!-- ============ 侧边栏 ============ -->
+  <aside class="side">
+    <div class="logo">
+      <div class="logo-mark">π</div>
+      <div class="txt"><b>sub2api</b><small>MOE CONSOLE</small></div>
+    </div>
+
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/><path d="M10 20v-5h4v5"/></svg>
+      <span class="txt">概览</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="14" r="4"/><path d="M11 11l8-8M16 4l2.5 2.5M13.5 6.5 16 9"/></svg>
+      <span class="txt">API Keys</span><span class="tag">3</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3l2.2 5.4L20 9l-4.5 3.8L17 19l-5-3.2L7 19l1.5-6.2L4 9l5.8-.6z"/></svg>
+      <span class="txt">模型广场</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>
+      <span class="txt">用量统计</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="7" width="18" height="12" rx="3"/><path d="M16 12.5h3M7 7V5.5A1.5 1.5 0 0 1 8.5 4h9A1.5 1.5 0 0 1 19 5.5V7"/></svg>
+      <span class="txt">钱包充值</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2.1-1.2L14 3h-4l-.5 2.7a7 7 0 0 0-2.1 1.2l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2.1 1.2L10 21h4l.5-2.7a7 7 0 0 0 2.1-1.2l2.3 1 2-3.4-2-1.5c.06-.4.1-.8.1-1.2z"/></svg>
+      <span class="txt">设置</span>
+    </div>
+
+    <div class="side-mascot">
+      <!-- 小π Q版 -->
+      <svg width="72" height="72" viewBox="0 0 100 100">
+        <path d="M28 8 Q20 22 30 30 Q24 18 34 12 Z" fill="#b79cff"/>
+        <circle cx="50" cy="52" r="30" fill="#ffe3d3"/>
+        <path d="M20 50 Q18 20 50 18 Q82 20 80 50 Q84 34 76 24 Q88 40 82 62 Q90 40 80 22 Q60 6 40 12 Q18 20 20 50 Z" fill="#b79cff"/>
+        <path d="M24 46 Q30 30 50 28 Q70 30 76 46 Q68 36 50 35 Q32 36 24 46Z" fill="#a384f5"/>
+        <ellipse cx="39" cy="55" rx="6.5" ry="8" fill="#fff"/>
+        <ellipse cx="61" cy="55" rx="6.5" ry="8" fill="#fff"/>
+        <ellipse cx="39" cy="57" rx="4.5" ry="6" fill="#8e6cf0"/>
+        <ellipse cx="61" cy="57" rx="4.5" ry="6" fill="#8e6cf0"/>
+        <circle cx="40.5" cy="54" r="2" fill="#fff"/><circle cx="62.5" cy="54" r="2" fill="#fff"/>
+        <circle cx="37.5" cy="59" r="1" fill="#fff"/><circle cx="59.5" cy="59" r="1" fill="#fff"/>
+        <ellipse cx="30" cy="65" rx="5" ry="3" fill="#ffb3c6"/>
+        <ellipse cx="70" cy="65" rx="5" ry="3" fill="#ffb3c6"/>
+        <path d="M45 68 Q50 72 55 68" stroke="#e2829b" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <path d="M50 84 Q38 84 36 96 L64 96 Q62 84 50 84Z" fill="#ff85a2"/>
+        <circle cx="50" cy="90" r="2.5" fill="#fff"/>
+      </svg>
+      <p>看板娘 <b>小π</b> 执勤中<br>今天也要元气满满哒~</p>
+    </div>
+  </aside>
+
+  <!-- ============ 主区域 ============ -->
+  <main class="main">
+
+    <div class="topbar">
+      <div class="search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#bfaecc" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        搜索模型 / 密钥 / 订单…
+      </div>
+      <div class="top-pill"><span class="dot"></span>全线节点正常 · 42ms</div>
+      <button class="btn-candy">✦ 充值糖果</button>
+      <div class="avatar">旅</div>
+    </div>
+
+    <!-- 欢迎横幅 -->
+    <section class="banner">
+      <svg class="sparkle" style="left:46%; top:14px" width="18" height="18" viewBox="0 0 24 24" fill="#ffd66e"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z"/></svg>
+      <svg class="sparkle" style="left:58%; bottom:16px; animation-delay:.8s" width="12" height="12" viewBox="0 0 24 24" fill="#ff9fbc"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z"/></svg>
+      <svg class="sparkle" style="left:70%; top:20px; animation-delay:1.4s" width="14" height="14" viewBox="0 0 24 24" fill="#b79cff"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z"/></svg>
+
+      <div>
+        <h1>晚上好，<em>旅行者</em> ✦</h1>
+        <p class="sub">今天已为你接力 <b>128,430</b> 次请求 · 消耗 <b>8.2M</b> Token · 小π全程护航中</p>
+        <div class="banner-actions">
+          <button class="chip-btn primary">＋ 新建 API Key</button>
+          <button class="chip-btn">逛模型广场</button>
+          <button class="chip-btn">查看用量报表</button>
+        </div>
+      </div>
+
+      <div class="mascot-wrap">
+        <div class="bubble">要先来一发十连调用吗？</div>
+        <!-- 小π 看板娘（大） -->
+        <svg width="150" height="150" viewBox="0 0 100 100">
+          <path d="M28 6 Q18 22 30 31 Q23 17 35 10 Z" fill="#b79cff"/>
+          <circle cx="50" cy="52" r="30" fill="#ffe3d3"/>
+          <path d="M20 50 Q18 20 50 18 Q82 20 80 50 Q84 34 76 24 Q88 40 82 62 Q90 40 80 22 Q60 6 40 12 Q18 20 20 50 Z" fill="#b79cff"/>
+          <path d="M24 46 Q30 30 50 28 Q70 30 76 46 Q68 36 50 35 Q32 36 24 46Z" fill="#a384f5"/>
+          <path d="M18 44 Q10 60 16 78 Q20 62 24 56Z" fill="#b79cff"/>
+          <path d="M82 44 Q90 60 84 78 Q80 62 76 56Z" fill="#b79cff"/>
+          <ellipse cx="39" cy="55" rx="6.5" ry="8" fill="#fff"/>
+          <ellipse cx="61" cy="55" rx="6.5" ry="8" fill="#fff"/>
+          <ellipse cx="39" cy="57" rx="4.5" ry="6" fill="#8e6cf0"/>
+          <ellipse cx="61" cy="57" rx="4.5" ry="6" fill="#8e6cf0"/>
+          <circle cx="40.5" cy="54" r="2" fill="#fff"/><circle cx="62.5" cy="54" r="2" fill="#fff"/>
+          <circle cx="37.5" cy="59" r="1" fill="#fff"/><circle cx="59.5" cy="59" r="1" fill="#fff"/>
+          <ellipse cx="30" cy="65" rx="5" ry="3" fill="#ffb3c6"/>
+          <ellipse cx="70" cy="65" rx="5" ry="3" fill="#ffb3c6"/>
+          <path d="M45 68 Q50 73 55 68" stroke="#e2829b" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <path d="M50 84 Q36 84 34 98 L66 98 Q64 84 50 84Z" fill="#ff85a2"/>
+          <path d="M42 88 L58 88" stroke="#ffd9e4" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="50" cy="92" r="2.5" fill="#fff"/>
+          <path d="M80 30 l1.6 4.4 4.4 1.6 -4.4 1.6 -1.6 4.4 -1.6 -4.4 -4.4 -1.6 4.4 -1.6z" fill="#ffd66e"/>
+        </svg>
+      </div>
+    </section>
+
+    <!-- 数据卡片 -->
+    <section class="stats">
+      <div class="stat s-pink">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="#f65d83" stroke-width="2" stroke-linecap="round"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg></div>
+        <p class="label">今日请求</p>
+        <p class="num">128,430</p>
+        <span class="delta up">▲ 12.4% 比昨天</span>
+      </div>
+      <div class="stat s-violet">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="#8e6cf0" stroke-width="2" stroke-linecap="round"><path d="M12 3l2.2 5.4L20 9l-4.5 3.8L17 19l-5-3.2L7 19l1.5-6.2L4 9l5.8-.6z"/></svg></div>
+        <p class="label">本月 Token</p>
+        <p class="num">8.2M</p>
+        <span class="delta up">▲ 5.1% 比上月</span>
+      </div>
+      <div class="stat s-lemon">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="#d9a412" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9 9.5c0-1.4 1.3-2.5 3-2.5s3 1.1 3 2.5-1.3 2.5-3 2.5-3 1.1-3 2.5 1.3 2.5 3 2.5 3-1.1 3-2.5M12 5v14"/></svg></div>
+        <p class="label">账户余额</p>
+        <p class="num">¥326.50</p>
+        <span class="delta down">约可用 41 天</span>
+      </div>
+      <div class="stat s-sky">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="#3c7fd4" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+        <p class="label">调用成功率</p>
+        <p class="num">99.7%</p>
+        <span class="delta down">42ms 平均延迟</span>
+      </div>
+    </section>
+
+    <!-- 内容网格 -->
+    <div class="grid">
+      <div style="display:flex; flex-direction:column; gap:16px;">
+
+        <!-- 用量图表 -->
+        <section class="panel">
+          <div class="panel-head">
+            <h3>近 7 日调用量</h3>
+            <div class="seg"><span class="on">请求数</span><span>Token</span><span>费用</span></div>
+          </div>
+          <svg viewBox="0 0 640 220" width="100%" style="display:block">
+            <defs>
+              <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#ff85a2" stop-opacity=".45"/>
+                <stop offset="1" stop-color="#b79cff" stop-opacity=".06"/>
+              </linearGradient>
+            </defs>
+            <g stroke="#ffe3ec" stroke-width="1.5">
+              <line x1="40" y1="30"  x2="620" y2="30"/>
+              <line x1="40" y1="80"  x2="620" y2="80"/>
+              <line x1="40" y1="130" x2="620" y2="130"/>
+              <line x1="40" y1="180" x2="620" y2="180"/>
+            </g>
+            <g font-size="10" fill="#bfaecc" font-family="inherit">
+              <text x="14" y="34">20w</text><text x="14" y="84">15w</text>
+              <text x="14" y="134">10w</text><text x="14" y="184">5w</text>
+            </g>
+            <path d="M60 150 C100 150 110 95 150 95 S210 130 245 120 S310 60 350 70 S420 105 460 90 S540 40 585 45 L585 180 L60 180 Z" fill="url(#area)"/>
+            <path d="M60 150 C100 150 110 95 150 95 S210 130 245 120 S310 60 350 70 S420 105 460 90 S540 40 585 45" fill="none" stroke="#f65d83" stroke-width="3" stroke-linecap="round"/>
+            <g>
+              <circle cx="60" cy="150" r="5" fill="#fff" stroke="#ff85a2" stroke-width="3"/>
+              <circle cx="150" cy="95" r="5" fill="#fff" stroke="#ff85a2" stroke-width="3"/>
+              <circle cx="245" cy="120" r="5" fill="#fff" stroke="#ff85a2" stroke-width="3"/>
+              <circle cx="350" cy="70" r="5" fill="#fff" stroke="#ff85a2" stroke-width="3"/>
+              <circle cx="460" cy="90" r="5" fill="#fff" stroke="#ff85a2" stroke-width="3"/>
+              <circle cx="585" cy="45" r="6" fill="#f65d83" stroke="#fff" stroke-width="3"/>
+              <path d="M585 22 l1.8 4.7 4.7 1.8 -4.7 1.8 -1.8 4.7 -1.8 -4.7 -4.7 -1.8 4.7 -1.8z" fill="#ffd66e"/>
+            </g>
+            <g font-size="11" fill="#8a7a95" text-anchor="middle">
+              <text x="60"  y="205">10-03</text><text x="150" y="205">10-04</text>
+              <text x="245" y="205">10-05</text><text x="350" y="205">10-06</text>
+              <text x="460" y="205">10-07</text><text x="585" y="205">今天</text>
+            </g>
+            <rect x="528" y="18" width="112" height="42" rx="12" fill="#fff" stroke="#ffd9e4" stroke-width="2"/>
+            <text x="584" y="35" font-size="10" fill="#8a7a95" text-anchor="middle">今日请求</text>
+            <text x="584" y="52" font-size="14" font-weight="700" fill="#f65d83" text-anchor="middle">18.6w</text>
+          </svg>
+        </section>
+
+        <!-- Key 列表 -->
+        <section class="panel">
+          <div class="panel-head">
+            <h3>我的 API Keys</h3>
+            <span class="more">管理全部 →</span>
+          </div>
+          <div class="key-row head">
+            <span>名称</span><span>密钥</span><span>额度</span><span>状态</span>
+          </div>
+          <div class="key-row">
+            <div class="key-name">
+              <div class="kicon" style="background:var(--pink-soft)">🗝</div>
+              <div>生产环境主力<small>绑定 12 个模型</small></div>
+            </div>
+            <span class="mono">sk-pai••••••8f2a</span>
+            <div class="quota-bar"><i style="width:76%; background:linear-gradient(90deg,var(--pink),var(--violet))"></i></div>
+            <span class="badge b-ok">✦ 正常</span>
+          </div>
+          <div class="key-row">
+            <div class="key-name">
+              <div class="kicon" style="background:var(--sky-soft)">🧪</div>
+              <div>测试调试专用<small>绑定 48 个模型</small></div>
+            </div>
+            <span class="mono">sk-pai••••••c91d</span>
+            <div class="quota-bar"><i style="width:34%; background:linear-gradient(90deg,var(--sky),var(--mint))"></i></div>
+            <span class="badge b-ok">✦ 正常</span>
+          </div>
+          <div class="key-row">
+            <div class="key-name">
+              <div class="kicon" style="background:#fff3d6">📦</div>
+              <div>旧版遗留服务<small>建议迁移到新版</small></div>
+            </div>
+            <span class="mono">sk-pai••••••4b07</span>
+            <div class="quota-bar"><i style="width:96%; background:linear-gradient(90deg,var(--lemon),#f0a03c)"></i></div>
+            <span class="badge b-warn">⚠ 额度将尽</span>
+          </div>
+        </section>
+      </div>
+
+      <!-- 右栏 -->
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <section class="panel fortune">
+          <div class="omikuji">⛩</div>
+          <h4>今日调用运势 · 大吉</h4>
+          <p class="luck">宜：十连调用 <b>gpt-5-pro</b><br>忌：忘记设置 <b>额度上限</b><br>幸运模型：<b>claude-sonnet-4</b></p>
+          <div class="lvl">
+            <div class="row"><span>旅行者等级</span><b>Lv.5</b></div>
+            <div class="exp"><i></i></div>
+            <div class="row" style="margin:7px 0 0;"><span>经验 680 / 1000</span><span>再调 3.2w 次升级</span></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h3>公告板</h3>
+            <span class="more">全部 →</span>
+          </div>
+          <div class="notice-item">
+            <span class="n-tag n-new">NEW</span>
+            <div><p>「gpt-5-pro」上架模型广场，限时 8 折计费，快来尝鲜哒~</p><time>10-09 12:00</time></div>
+          </div>
+          <div class="notice-item">
+            <span class="n-tag n-up">UP</span>
+            <div><p>亚洲节点扩容完成，平均延迟下降 38%，体验更丝滑</p><time>10-08 20:30</time></div>
+          </div>
+          <div class="notice-item">
+            <span class="n-tag n-new">NEW</span>
+            <div><p>累计充值满 ¥500 赠「小π」限定头像框，活动月底截止</p><time>10-07 10:00</time></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

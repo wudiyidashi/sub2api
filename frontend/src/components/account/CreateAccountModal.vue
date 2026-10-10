@@ -266,6 +266,15 @@
         </div>
       </div>
 
+      <AccountDriverSelector
+        v-model="form.account_driver_id"
+        :active="show"
+        :platform="form.platform"
+        :account-type="form.type"
+        @update:ready="accountDriverReady = $event"
+        @update:driver="selectedAccountDriver = $event"
+      />
+
       <!-- Account Type Selection (Anthropic) -->
       <div v-if="form.platform === 'anthropic'">
         <label class="input-label">{{ t('admin.accounts.accountType') }}</label>
@@ -3190,7 +3199,7 @@
 
       <!-- OpenAI WS Mode 三态（off/ctx_pool/passthrough） -->
       <div
-        v-if="form.platform === 'openai' && (accountCategory === 'oauth-based' || accountCategory === 'apikey')"
+        v-if="form.platform === 'openai' && (!isCodexHTTPDriver || enhancedWebSocketReady) && (accountCategory === 'oauth-based' || accountCategory === 'apikey')"
         data-testid="create-openai-ws-mode"
         class="border-t border-gray-200 pt-4 dark:border-dark-600"
       >
@@ -3205,7 +3214,7 @@
             </p>
           </div>
           <div class="w-52">
-            <Select v-model="openaiResponsesWebSocketV2Mode" :options="openAIWSModeOptions" />
+            <Select v-model="openaiResponsesWebSocketV2Mode" data-testid="create-openai-ws-mode-select" :options="openAIWSModeOptions" />
           </div>
         </div>
       </div>
@@ -3604,6 +3613,9 @@
 
     <!-- Step 2: OAuth Authorization -->
     <div v-else class="space-y-5">
+      <p v-if="isCodexHTTPDriver" class="input-hint" data-testid="enhanced-account-import-hint">
+        {{ t('admin.accounts.accountDriver.enhancedImportHint') }}
+      </p>
       <OAuthAuthorizationFlow
         ref="oauthFlowRef"
         :add-method="form.platform === 'anthropic' ? addMethod : 'oauth'"
@@ -3620,8 +3632,8 @@
         :show-session-token-option="false"
         :show-access-token-option="false"
         :show-codex-session-import-option="form.platform === 'openai'"
-        :show-agent-identity-option="form.platform === 'openai'"
-        :show-codex-pat-option="form.platform === 'openai'"
+        :show-agent-identity-option="form.platform === 'openai' && !isCodexHTTPDriver"
+        :show-codex-pat-option="form.platform === 'openai' && !isCodexHTTPDriver"
         :show-sso-option="form.platform === 'grok'"
         :show-email-password-option="false"
         :show-manual-option="true"
@@ -3649,7 +3661,7 @@
         <button
           type="submit"
           form="create-account-form"
-          :disabled="submitting"
+          :disabled="submitting || !accountDriverReady"
           class="btn btn-primary"
           data-tour="account-form-submit"
         >
@@ -3689,7 +3701,7 @@
         <button
           v-if="isManualInputMethod"
           type="button"
-          :disabled="!canExchangeCode"
+          :disabled="!canExchangeCode || !accountDriverReady"
           class="btn btn-primary"
           @click="handleExchangeCode"
         >
@@ -3990,7 +4002,10 @@ import type {
   OpenAIResponsesMode,
   OpenAIEndpointCapability
 } from '@/types'
+import type { AccountDriver, AccountDriverBinding } from '@/features/account-drivers/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import AccountDriverSelector from '@/features/account-drivers/AccountDriverSelector.vue'
+import { CODEX_HTTP_DRIVER_ID } from '@/features/account-drivers/useAccountDrivers'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
@@ -4830,6 +4845,7 @@ const tempUnschedPresets = computed(() => [
 const form = reactive({
   name: '',
   notes: '',
+  account_driver_id: 'native',
   platform: 'anthropic' as AccountPlatform,
   type: 'oauth' as AccountType, // Will be 'oauth', 'setup-token', or 'apikey'
   credentials: {} as Record<string, unknown>,
@@ -4841,6 +4857,23 @@ const form = reactive({
   group_ids: [] as number[],
   expires_at: null as number | null
 })
+const accountDriverReady = ref(true)
+const selectedAccountDriver = ref<AccountDriver | AccountDriverBinding>()
+const isCodexHTTPDriver = computed(() => form.account_driver_id === CODEX_HTTP_DRIVER_ID)
+const enhancedWebSocketReady = computed(() => selectedAccountDriver.value?.id === CODEX_HTTP_DRIVER_ID &&
+  selectedAccountDriver.value.available && selectedAccountDriver.value.transport_protocols?.includes('websocket') === true)
+
+watch(selectedAccountDriver, driver => {
+  if (isCodexHTTPDriver.value && driver?.id === CODEX_HTTP_DRIVER_ID && !enhancedWebSocketReady.value) {
+    openaiOAuthResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
+  }
+})
+
+function ensureAccountDriverReady() {
+  if (accountDriverReady.value && (!isCodexHTTPDriver.value || (form.platform === 'openai' && form.type === 'oauth'))) return true
+  appStore.showError(t('admin.accounts.accountDriver.unavailable'))
+  return false
+}
 
 // Helper to check if current type needs OAuth flow
 const isOAuthFlow = computed(() => {
@@ -5415,6 +5448,9 @@ const resetForm = () => {
   step.value = 1
   form.name = ''
   form.notes = ''
+  form.account_driver_id = 'native'
+  accountDriverReady.value = true
+  selectedAccountDriver.value = undefined
   form.platform = 'anthropic'
   form.type = 'oauth'
   form.credentials = {}
@@ -5541,8 +5577,9 @@ const buildOpenAIExtra = (base?: Record<string, unknown>): Record<string, unknow
 
   const extra: Record<string, unknown> = { ...(base || {}) }
   if (accountCategory.value === 'oauth-based') {
-    extra.openai_oauth_responses_websockets_v2_mode = openaiOAuthResponsesWebSocketV2Mode.value
-    extra.openai_oauth_responses_websockets_v2_enabled = isOpenAIWSModeEnabled(openaiOAuthResponsesWebSocketV2Mode.value)
+    const wsMode = isCodexHTTPDriver.value && !enhancedWebSocketReady.value ? OPENAI_WS_MODE_OFF : openaiOAuthResponsesWebSocketV2Mode.value
+    extra.openai_oauth_responses_websockets_v2_mode = wsMode
+    extra.openai_oauth_responses_websockets_v2_enabled = isOpenAIWSModeEnabled(wsMode)
   } else if (accountCategory.value === 'apikey') {
     extra.openai_apikey_responses_websockets_v2_mode = openaiAPIKeyResponsesWebSocketV2Mode.value
     extra.openai_apikey_responses_websockets_v2_enabled = isOpenAIWSModeEnabled(openaiAPIKeyResponsesWebSocketV2Mode.value)
@@ -5738,6 +5775,7 @@ const handleVertexServiceAccountDrop = async (event: DragEvent) => {
 }
 
 const handleSubmit = async () => {
+  if (!ensureAccountDriverReady()) return
   // For OAuth-based type, handle OAuth flow (goes to step 2)
   if (isOAuthFlow.value) {
     if (!isGrokSSOInputMethod.value && !form.name.trim()) {
@@ -6111,6 +6149,7 @@ const createAccountAndFinish = async (
   await doCreateAccount({
     name: form.name,
     notes: form.notes,
+    account_driver_id: form.account_driver_id,
     platform,
     type,
     credentials,
@@ -6176,6 +6215,7 @@ const handleGrokValidateRT = async (refreshTokenInput: string) => {
         }
 
         await adminAPI.accounts.create({
+          account_driver_id: form.account_driver_id,
           name: accountName,
           notes: form.notes,
           platform: 'grok',
@@ -6353,6 +6393,7 @@ const handleGrokAuthorizePassword = async (emailPasswordInput: string) => {
         }
 
         await adminAPI.accounts.create({
+          account_driver_id: form.account_driver_id,
           name: accountName,
           notes: form.notes,
           platform: 'grok',
@@ -6404,6 +6445,7 @@ const handleGrokAuthorizePassword = async (emailPasswordInput: string) => {
 
 // OpenAI OAuth 授权码兑换
 const handleOpenAIExchange = async (authCode: string) => {
+  if (!ensureAccountDriverReady()) return
   const oauthClient = openaiOAuth
   if (!authCode.trim() || !oauthClient.sessionId.value) return
 
@@ -6452,6 +6494,7 @@ const handleOpenAIExchange = async (authCode: string) => {
 
     if (shouldCreateOpenAI) {
       await adminAPI.accounts.create({
+        account_driver_id: form.account_driver_id,
         name: form.name,
         notes: form.notes,
         platform: 'openai',
@@ -6538,6 +6581,11 @@ const isAgentIdentityImportContent = (content: string) => {
 }
 
 const handleOpenAIImportCodexSession = async (content: string) => {
+  if (!ensureAccountDriverReady()) return
+  if (isCodexHTTPDriver.value && isAgentIdentityImportContent(content)) {
+    appStore.showError(t('admin.accounts.accountDriver.unsupportedImport'))
+    return
+  }
   const oauthClient = openaiOAuth
   const trimmed = content.trim()
   if (!trimmed) {
@@ -6560,6 +6608,7 @@ const handleOpenAIImportCodexSession = async (content: string) => {
   try {
     const extra = buildOpenAICodexImportExtra()
     const result = await adminAPI.accounts.importCodexSession({
+      account_driver_id: form.account_driver_id,
       content: trimmed,
       name: form.name,
       notes: form.notes || null,
@@ -6620,6 +6669,11 @@ const handleOpenAIImportCodexSession = async (content: string) => {
 }
 
 const handleOpenAIImportCodexPAT = async (accessToken: string) => {
+  if (!ensureAccountDriverReady()) return
+  if (isCodexHTTPDriver.value) {
+    appStore.showError(t('admin.accounts.accountDriver.unsupportedImport'))
+    return
+  }
   const oauthClient = openaiOAuth
   const trimmed = accessToken.trim()
   if (!trimmed) {
@@ -6670,6 +6724,7 @@ const handleOpenAIImportCodexPAT = async (accessToken: string) => {
 
 // OpenAI RT 批量验证和创建（共享逻辑）
 const handleOpenAIBatchRT = async (refreshTokenInput: string, clientId?: string) => {
+  if (!ensureAccountDriverReady()) return
   const oauthClient = openaiOAuth
   if (!refreshTokenInput.trim()) return
 
@@ -6733,6 +6788,7 @@ const handleOpenAIBatchRT = async (refreshTokenInput: string, clientId?: string)
 
         if (shouldCreateOpenAI) {
           await adminAPI.accounts.create({
+            account_driver_id: form.account_driver_id,
             name: accountName,
             notes: form.notes,
             platform: 'openai',
@@ -6832,6 +6888,7 @@ const handleAntigravityValidateRT = async (refreshTokenInput: string) => {
 
         // Note: Antigravity doesn't have buildExtraInfo, so we pass empty extra or rely on credentials
         const createPayload = withAntigravityConfirmFlag({
+          account_driver_id: form.account_driver_id,
           name: accountName,
           notes: form.notes,
           platform: 'antigravity',
@@ -7213,6 +7270,7 @@ const handleCookieAuth = async (sessionKey: string) => {
         }
 
         await adminAPI.accounts.create({
+          account_driver_id: form.account_driver_id,
           name: accountName,
           notes: form.notes,
           platform: form.platform,

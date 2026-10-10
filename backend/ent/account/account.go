@@ -30,6 +30,10 @@ const (
 	FieldPlatform = "platform"
 	// FieldType holds the string denoting the type field in the database.
 	FieldType = "type"
+	// FieldAccountDriverID holds the string denoting the account_driver_id field in the database.
+	FieldAccountDriverID = "account_driver_id"
+	// FieldAccountDriverRevision holds the string denoting the account_driver_revision field in the database.
+	FieldAccountDriverRevision = "account_driver_revision"
 	// FieldCredentials holds the string denoting the credentials field in the database.
 	FieldCredentials = "credentials"
 	// FieldExtra holds the string denoting the extra field in the database.
@@ -138,6 +142,8 @@ var Columns = []string{
 	FieldNotes,
 	FieldPlatform,
 	FieldType,
+	FieldAccountDriverID,
+	FieldAccountDriverRevision,
 	FieldCredentials,
 	FieldExtra,
 	FieldProxyID,
@@ -200,6 +206,14 @@ var (
 	PlatformValidator func(string) error
 	// TypeValidator is a validator for the "type" field. It is called by the builders before save.
 	TypeValidator func(string) error
+	// DefaultAccountDriverID holds the default value on creation for the "account_driver_id" field.
+	DefaultAccountDriverID string
+	// AccountDriverIDValidator is a validator for the "account_driver_id" field. It is called by the builders before save.
+	AccountDriverIDValidator func(string) error
+	// DefaultAccountDriverRevision holds the default value on creation for the "account_driver_revision" field.
+	DefaultAccountDriverRevision int64
+	// AccountDriverRevisionValidator is a validator for the "account_driver_revision" field. It is called by the builders before save.
+	AccountDriverRevisionValidator func(int64) error
 	// DefaultCredentials holds the default value on creation for the "credentials" field.
 	DefaultCredentials func() map[string]interface{}
 	// DefaultExtra holds the default value on creation for the "extra" field.
@@ -289,6 +303,16 @@ func ByPlatform(opts ...sql.OrderTermOption) OrderOption {
 // ByType orders the results by the type field.
 func ByType(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldType, opts...).ToFunc()
+}
+
+// ByAccountDriverID orders the results by the account_driver_id field.
+func ByAccountDriverID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAccountDriverID, opts...).ToFunc()
+}
+
+// ByAccountDriverRevision orders the results by the account_driver_revision field.
+func ByAccountDriverRevision(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAccountDriverRevision, opts...).ToFunc()
 }
 
 // ByProxyID orders the results by the proxy_id field.

@@ -18,7 +18,14 @@ import (
 )
 
 // Forward forwards request to OpenAI API
-func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, body []byte) (*OpenAIForwardResult, error) {
+func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, body []byte) (forwardResult *OpenAIForwardResult, forwardErr error) {
+	ctx, releaseDriverOperation, admissionErr := acquireOpenAIAccountDriverOperation(ctx, account)
+	if admissionErr != nil {
+		return nil, admissionErr
+	}
+	defer releaseDriverOperation()
+	ctx, driverTracker := withAccountDriverAttemptTracking(ctx, body)
+	defer func() { forwardErr = restrictAccountDriverFailover(account, driverTracker, forwardErr) }()
 	beginUpstreamResponseModelObservation(c)
 	ClearActualOpenAIUpstreamEndpoint(c)
 	if shouldForwardOpenAIResponsesViaRawChatCompletions(account) {
@@ -111,6 +118,17 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	wsDecision := s.getOpenAIWSProtocolResolver().Resolve(account)
 	// 仅允许 WS 入站请求走 WS 上游，避免出现 HTTP -> WS 协议混用。
 	wsDecision = resolveOpenAIWSDecisionByClientTransport(wsDecision, GetOpenAIClientTransport(c))
+	if wsDecision.Transport != OpenAIUpstreamTransportResponsesWebsocketV2 {
+		if err := s.managedWSHTTPContinuationError(account, strings.TrimSpace(gjson.GetBytes(body, "previous_response_id").String())); err != nil {
+			if c != nil && c.Writer != nil && !c.Writer.Written() {
+				c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{
+					"type": "invalid_request_error", "param": "previous_response_id",
+					"message": "The original WebSocket connection is unavailable. Send full input without previous_response_id to start a new chain.",
+				}})
+			}
+			return nil, err
+		}
+	}
 	passthroughEnabled := account.IsOpenAIPassthroughEnabled()
 	compactPath := isOpenAIResponsesCompactPath(c)
 	if shouldFlattenOpenAIResponsesNamespaces(account, wsDecision.Transport, passthroughEnabled, compactPath) {
@@ -907,6 +925,9 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			}
 			if c != nil && c.Writer != nil && c.Writer.Written() {
 				break
+			}
+			if managedWSReplayForbidden(wsErr) {
+				break wsRetryLoop
 			}
 			var taskRecoveredErr *agentIdentityTaskRecoveredError
 			if errors.As(wsErr, &taskRecoveredErr) {

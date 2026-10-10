@@ -138,12 +138,17 @@ func createAccountRecord(ctx context.Context, client *dbent.Client, account *ser
 	if account == nil {
 		return service.ErrAccountNilInput
 	}
+	if err := service.ValidateAccountDriverState(account); err != nil {
+		return err
+	}
 
 	builder := client.Account.Create().
 		SetName(account.Name).
 		SetNillableNotes(account.Notes).
 		SetPlatform(account.Platform).
 		SetType(account.Type).
+		SetAccountDriverID(account.EffectiveAccountDriverID()).
+		SetAccountDriverRevision(1).
 		SetCredentials(normalizeJSONMap(account.Credentials)).
 		SetExtra(normalizeJSONMap(account.Extra)).
 		SetConcurrency(account.Concurrency).
@@ -199,6 +204,8 @@ func createAccountRecord(ctx context.Context, client *dbent.Client, account *ser
 	}
 
 	account.ID = created.ID
+	account.AccountDriverID = created.AccountDriverID
+	account.AccountDriverRevision = created.AccountDriverRevision
 	account.CreatedAt = created.CreatedAt
 	account.UpdatedAt = created.UpdatedAt
 	return nil
@@ -465,6 +472,9 @@ func (r *accountRepository) updateAccount(
 	if account == nil {
 		return nil
 	}
+	if err := service.ValidateAccountDriverState(account); err != nil {
+		return err
+	}
 
 	baseCtx := ctx
 	contextTx := dbent.TxFromContext(ctx)
@@ -506,6 +516,10 @@ func (r *accountRepository) updateAccount(
 	}
 
 	account.UpdatedAt = updated.UpdatedAt
+	// Ordinary writes preserve the row binding even when their caller used an
+	// old snapshot that did not carry the driver fields.
+	account.AccountDriverID = updated.AccountDriverID
+	account.AccountDriverRevision = updated.AccountDriverRevision
 	// 普通账号编辑（如 model_mapping / credentials）也需要立即刷新单账号快照，
 	// 否则网关在 outbox worker 延迟或异常时仍可能读到旧配置。
 	if contextTx == nil {
@@ -1100,7 +1114,14 @@ func (r *accountRepository) accountListFilteredQuery(platform, accountType, stat
 }
 
 func (r *accountRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupID int64, privacyMode string) ([]service.Account, *pagination.PaginationResult, error) {
+	return r.ListWithDriverFilters(ctx, params, platform, accountType, status, search, groupID, privacyMode, "")
+}
+
+func (r *accountRepository) ListWithDriverFilters(ctx context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupID int64, privacyMode, driverID string) ([]service.Account, *pagination.PaginationResult, error) {
 	q := r.accountListFilteredQuery(platform, accountType, status, search, groupID, privacyMode)
+	if driverID != "" {
+		q = q.Where(dbaccount.AccountDriverIDEQ(driverID))
+	}
 	// Clone before Count so interceptor-appended predicates (SoftDeleteMixin's
 	// deleted_at IS NULL) don't accumulate on the shared builder and pollute the
 	// subsequent list query. Same pattern used in group_repo/promo_code_repo/user_repo
@@ -1130,7 +1151,15 @@ func (r *accountRepository) ListWithFilters(ctx context.Context, params paginati
 }
 
 func (r *accountRepository) ListAllWithFilters(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode string) ([]service.Account, error) {
-	accounts, err := r.accountListFilteredQuery(platform, accountType, status, search, groupID, privacyMode).All(ctx)
+	return r.ListAllWithDriverFilters(ctx, platform, accountType, status, search, groupID, privacyMode, "")
+}
+
+func (r *accountRepository) ListAllWithDriverFilters(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode, driverID string) ([]service.Account, error) {
+	q := r.accountListFilteredQuery(platform, accountType, status, search, groupID, privacyMode)
+	if driverID != "" {
+		q = q.Where(dbaccount.AccountDriverIDEQ(driverID))
+	}
+	accounts, err := q.All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1155,6 +1184,8 @@ func (r *accountRepository) ListOpsAccountsForStats(ctx context.Context, platfor
 			dbaccount.FieldID,
 			dbaccount.FieldName,
 			dbaccount.FieldPlatform,
+			dbaccount.FieldAccountDriverID,
+			dbaccount.FieldAccountDriverRevision,
 			dbaccount.FieldConcurrency,
 			dbaccount.FieldLoadFactor,
 			dbaccount.FieldStatus,
@@ -3620,6 +3651,8 @@ func accountEntityToService(m *dbent.Account) *service.Account {
 	rateMultiplier := m.RateMultiplier
 
 	return &service.Account{
+		AccountDriverID:         m.AccountDriverID,
+		AccountDriverRevision:   m.AccountDriverRevision,
 		ID:                      m.ID,
 		Name:                    m.Name,
 		Notes:                   m.Notes,

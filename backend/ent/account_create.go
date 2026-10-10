@@ -99,6 +99,34 @@ func (_c *AccountCreate) SetType(v string) *AccountCreate {
 	return _c
 }
 
+// SetAccountDriverID sets the "account_driver_id" field.
+func (_c *AccountCreate) SetAccountDriverID(v string) *AccountCreate {
+	_c.mutation.SetAccountDriverID(v)
+	return _c
+}
+
+// SetNillableAccountDriverID sets the "account_driver_id" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableAccountDriverID(v *string) *AccountCreate {
+	if v != nil {
+		_c.SetAccountDriverID(*v)
+	}
+	return _c
+}
+
+// SetAccountDriverRevision sets the "account_driver_revision" field.
+func (_c *AccountCreate) SetAccountDriverRevision(v int64) *AccountCreate {
+	_c.mutation.SetAccountDriverRevision(v)
+	return _c
+}
+
+// SetNillableAccountDriverRevision sets the "account_driver_revision" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableAccountDriverRevision(v *int64) *AccountCreate {
+	if v != nil {
+		_c.SetAccountDriverRevision(*v)
+	}
+	return _c
+}
+
 // SetCredentials sets the "credentials" field.
 func (_c *AccountCreate) SetCredentials(v map[string]interface{}) *AccountCreate {
 	_c.mutation.SetCredentials(v)
@@ -539,6 +567,14 @@ func (_c *AccountCreate) defaults() error {
 		v := account.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.AccountDriverID(); !ok {
+		v := account.DefaultAccountDriverID
+		_c.mutation.SetAccountDriverID(v)
+	}
+	if _, ok := _c.mutation.AccountDriverRevision(); !ok {
+		v := account.DefaultAccountDriverRevision
+		_c.mutation.SetAccountDriverRevision(v)
+	}
 	if _, ok := _c.mutation.Credentials(); !ok {
 		if account.DefaultCredentials == nil {
 			return fmt.Errorf("ent: uninitialized account.DefaultCredentials (forgotten import ent/runtime?)")
@@ -614,6 +650,22 @@ func (_c *AccountCreate) check() error {
 	if v, ok := _c.mutation.GetType(); ok {
 		if err := account.TypeValidator(v); err != nil {
 			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "Account.type": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.AccountDriverID(); !ok {
+		return &ValidationError{Name: "account_driver_id", err: errors.New(`ent: missing required field "Account.account_driver_id"`)}
+	}
+	if v, ok := _c.mutation.AccountDriverID(); ok {
+		if err := account.AccountDriverIDValidator(v); err != nil {
+			return &ValidationError{Name: "account_driver_id", err: fmt.Errorf(`ent: validator failed for field "Account.account_driver_id": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.AccountDriverRevision(); !ok {
+		return &ValidationError{Name: "account_driver_revision", err: errors.New(`ent: missing required field "Account.account_driver_revision"`)}
+	}
+	if v, ok := _c.mutation.AccountDriverRevision(); ok {
+		if err := account.AccountDriverRevisionValidator(v); err != nil {
+			return &ValidationError{Name: "account_driver_revision", err: fmt.Errorf(`ent: validator failed for field "Account.account_driver_revision": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.Credentials(); !ok {
@@ -712,6 +764,14 @@ func (_c *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.GetType(); ok {
 		_spec.SetField(account.FieldType, field.TypeString, value)
 		_node.Type = value
+	}
+	if value, ok := _c.mutation.AccountDriverID(); ok {
+		_spec.SetField(account.FieldAccountDriverID, field.TypeString, value)
+		_node.AccountDriverID = value
+	}
+	if value, ok := _c.mutation.AccountDriverRevision(); ok {
+		_spec.SetField(account.FieldAccountDriverRevision, field.TypeInt64, value)
+		_node.AccountDriverRevision = value
 	}
 	if value, ok := _c.mutation.Credentials(); ok {
 		_spec.SetField(account.FieldCredentials, field.TypeJSON, value)
@@ -1020,6 +1080,36 @@ func (u *AccountUpsert) SetType(v string) *AccountUpsert {
 // UpdateType sets the "type" field to the value that was provided on create.
 func (u *AccountUpsert) UpdateType() *AccountUpsert {
 	u.SetExcluded(account.FieldType)
+	return u
+}
+
+// SetAccountDriverID sets the "account_driver_id" field.
+func (u *AccountUpsert) SetAccountDriverID(v string) *AccountUpsert {
+	u.Set(account.FieldAccountDriverID, v)
+	return u
+}
+
+// UpdateAccountDriverID sets the "account_driver_id" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateAccountDriverID() *AccountUpsert {
+	u.SetExcluded(account.FieldAccountDriverID)
+	return u
+}
+
+// SetAccountDriverRevision sets the "account_driver_revision" field.
+func (u *AccountUpsert) SetAccountDriverRevision(v int64) *AccountUpsert {
+	u.Set(account.FieldAccountDriverRevision, v)
+	return u
+}
+
+// UpdateAccountDriverRevision sets the "account_driver_revision" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateAccountDriverRevision() *AccountUpsert {
+	u.SetExcluded(account.FieldAccountDriverRevision)
+	return u
+}
+
+// AddAccountDriverRevision adds v to the "account_driver_revision" field.
+func (u *AccountUpsert) AddAccountDriverRevision(v int64) *AccountUpsert {
+	u.Add(account.FieldAccountDriverRevision, v)
 	return u
 }
 
@@ -1571,6 +1661,41 @@ func (u *AccountUpsertOne) SetType(v string) *AccountUpsertOne {
 func (u *AccountUpsertOne) UpdateType() *AccountUpsertOne {
 	return u.Update(func(s *AccountUpsert) {
 		s.UpdateType()
+	})
+}
+
+// SetAccountDriverID sets the "account_driver_id" field.
+func (u *AccountUpsertOne) SetAccountDriverID(v string) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetAccountDriverID(v)
+	})
+}
+
+// UpdateAccountDriverID sets the "account_driver_id" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateAccountDriverID() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateAccountDriverID()
+	})
+}
+
+// SetAccountDriverRevision sets the "account_driver_revision" field.
+func (u *AccountUpsertOne) SetAccountDriverRevision(v int64) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetAccountDriverRevision(v)
+	})
+}
+
+// AddAccountDriverRevision adds v to the "account_driver_revision" field.
+func (u *AccountUpsertOne) AddAccountDriverRevision(v int64) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.AddAccountDriverRevision(v)
+	})
+}
+
+// UpdateAccountDriverRevision sets the "account_driver_revision" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateAccountDriverRevision() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateAccountDriverRevision()
 	})
 }
 
@@ -2356,6 +2481,41 @@ func (u *AccountUpsertBulk) SetType(v string) *AccountUpsertBulk {
 func (u *AccountUpsertBulk) UpdateType() *AccountUpsertBulk {
 	return u.Update(func(s *AccountUpsert) {
 		s.UpdateType()
+	})
+}
+
+// SetAccountDriverID sets the "account_driver_id" field.
+func (u *AccountUpsertBulk) SetAccountDriverID(v string) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetAccountDriverID(v)
+	})
+}
+
+// UpdateAccountDriverID sets the "account_driver_id" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateAccountDriverID() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateAccountDriverID()
+	})
+}
+
+// SetAccountDriverRevision sets the "account_driver_revision" field.
+func (u *AccountUpsertBulk) SetAccountDriverRevision(v int64) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetAccountDriverRevision(v)
+	})
+}
+
+// AddAccountDriverRevision adds v to the "account_driver_revision" field.
+func (u *AccountUpsertBulk) AddAccountDriverRevision(v int64) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.AddAccountDriverRevision(v)
+	})
+}
+
+// UpdateAccountDriverRevision sets the "account_driver_revision" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateAccountDriverRevision() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateAccountDriverRevision()
 	})
 }
 

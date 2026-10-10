@@ -394,6 +394,8 @@ type UpdateGroupInput struct {
 }
 
 type CreateAccountInput struct {
+	AccountDriverID    string
+	DriverSettings     map[string]any
 	Name               string
 	Notes              *string
 	Platform           string
@@ -426,6 +428,8 @@ type ShadowOptions struct {
 }
 
 type UpdateAccountInput struct {
+	AccountDriverID       string
+	DriverSettings        map[string]any
 	Name                  string
 	Notes                 *string
 	Type                  string // Account type: oauth, setup-token, apikey
@@ -467,12 +471,13 @@ type BulkUpdateAccountsInput struct {
 }
 
 type BulkUpdateAccountFilters struct {
-	Platform    string
-	Type        string
-	Status      string
-	Group       string
-	Search      string
-	PrivacyMode string
+	AccountDriverID string
+	Platform        string
+	Type            string
+	Status          string
+	Group           string
+	Search          string
+	PrivacyMode     string
 }
 
 // BulkUpdateAccountResult captures the result for a single account update.
@@ -683,32 +688,33 @@ var ErrRPMStatusUnavailable = infraerrors.New(http.StatusNotImplemented, "RPM_ST
 
 // adminServiceImpl implements AdminService
 type adminServiceImpl struct {
-	cfg                  *config.Config
-	userRepo             UserRepository
-	groupRepo            GroupRepository
-	groupDuplicateRepo   GroupDuplicateRepository
-	emptyGroupDeleteRepo EmptyGroupDeleteRepository
-	accountRepo          AccountRepository
-	accountDuplicateRepo AccountDuplicateRepository
-	accountBillingRepo   AccountBillingSettingsRepository
-	proxyRepo            ProxyRepository
-	apiKeyRepo           APIKeyRepository
-	redeemCodeRepo       RedeemCodeRepository
-	userGroupRateRepo    UserGroupRateRepository
-	userRPMCache         UserRPMCache
-	billingCacheService  *BillingCacheService
-	proxyProber          ProxyExitInfoProber
-	proxyLatencyCache    ProxyLatencyCache
-	authCacheInvalidator APIKeyAuthCacheInvalidator
-	entClient            *dbent.Client // 用于开启数据库事务
-	settingService       *SettingService
-	defaultSubAssigner   DefaultSubscriptionAssigner
-	userSubRepo          UserSubscriptionRepository
-	privacyClientFactory PrivacyClientFactory
-	runtimeBlocker       AccountRuntimeBlocker
-	affiliateService     adminRechargeAffiliateAccruer
-	compositeRouteRepo   CompositeModelRouteRepository
-	compositeResolver    *CompositeRouteResolver
+	accountDriverMaintenance *AccountDriverMaintenanceService
+	cfg                      *config.Config
+	userRepo                 UserRepository
+	groupRepo                GroupRepository
+	groupDuplicateRepo       GroupDuplicateRepository
+	emptyGroupDeleteRepo     EmptyGroupDeleteRepository
+	accountRepo              AccountRepository
+	accountDuplicateRepo     AccountDuplicateRepository
+	accountBillingRepo       AccountBillingSettingsRepository
+	proxyRepo                ProxyRepository
+	apiKeyRepo               APIKeyRepository
+	redeemCodeRepo           RedeemCodeRepository
+	userGroupRateRepo        UserGroupRateRepository
+	userRPMCache             UserRPMCache
+	billingCacheService      *BillingCacheService
+	proxyProber              ProxyExitInfoProber
+	proxyLatencyCache        ProxyLatencyCache
+	authCacheInvalidator     APIKeyAuthCacheInvalidator
+	entClient                *dbent.Client // 用于开启数据库事务
+	settingService           *SettingService
+	defaultSubAssigner       DefaultSubscriptionAssigner
+	userSubRepo              UserSubscriptionRepository
+	privacyClientFactory     PrivacyClientFactory
+	runtimeBlocker           AccountRuntimeBlocker
+	affiliateService         adminRechargeAffiliateAccruer
+	compositeRouteRepo       CompositeModelRouteRepository
+	compositeResolver        *CompositeRouteResolver
 	// 分组平台变更后用来失效渠道缓存；可为 nil（缓存会在 TTL 到期后自然重建）
 	channelCacheInvalidator ChannelCacheInvalidator
 }

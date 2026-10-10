@@ -1,9 +1,12 @@
 export default {
   promptAudit: {
-    title: 'Prompt Audit',
-    description: 'Review user input asynchronously or block it synchronously through OpenAI-compatible Qwen3Guard nodes. Full prompts are stored with events for admin review.',
+    title: 'Content Audit',
+    description: 'Inspect API request chains, persisted diagnostics, and prompt risk events in one workspace.',
     configVersion: 'Config version v{version}',
-    tabs: { config: 'Configuration', events: 'Events' },
+    tabs: { config: 'Configuration', events: 'Risk events', requests: 'Request audit' },
+    requests: {
+      title: 'API request audit', description: 'Inspect request chains, status, latency, and persisted diagnostics for every API request.', timeRange: 'Time range', time: 'Time', kind: 'Result', success: 'Success', error: 'Error', platform: 'Platform', model: 'Model', requestId: 'Request ID', keyword: 'Keyword', sort: 'Sort', newest: 'Newest', slowest: 'Slowest', slowestTtft: 'Slowest TTFT', route: 'Endpoint', latency: 'Latency', identity: 'Identity / account', risk: 'Risk / error', empty: 'No request records', loadFailed: 'Failed to load request audit', detailTitle: 'Request details', viewRisk: 'View error details', detailLoadFailed: 'Failed to load request details', clientRequest: 'Client request', upstreamRequest: 'Upstream request', upstreamResponse: 'Upstream response', clientResponse: 'Client response', upstreamAttempts: 'Upstream attempts and errors', noAttempts: 'No persisted upstream attempts.', sanitizedPayloads: 'Persisted sanitized error payloads', riskEvents: 'Related risk events', noRawPayload: 'No raw request body is available; only data actually persisted by the service is shown.', notPersisted: 'This section was not persisted.', headers: 'Headers', body: 'Body / JSON', raw: 'Raw text', sseEvents: 'SSE events', websocketEvents: 'WebSocket events', truncated: 'Truncated'
+    },
     actions: { refresh: 'Refresh runtime', retry: 'Retry', Allow: 'Allow', Warn: 'Warn', Block: 'Block' },
     common: { actions: 'Actions', never: 'Never' },
     mode: { off: 'Off', async_audit: 'Async audit only', blocking: 'Synchronous audit and block' },

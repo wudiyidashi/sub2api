@@ -22,6 +22,7 @@ import (
 const codexImportClockSkewSeconds int64 = 120
 
 type CodexSessionImportRequest struct {
+	AccountDriverID         string         `json:"account_driver_id"`
 	Content                 string         `json:"content"`
 	Contents                []string       `json:"contents"`
 	Name                    string         `json:"name"`
@@ -121,6 +122,10 @@ func (h *AccountHandler) ImportCodexSession(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
+	if err := service.ValidateAccountDriverForAccount(req.AccountDriverID, service.PlatformOpenAI, service.AccountTypeOAuth, nil); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 	if err := service.ValidateOpenAILongContextBillingExtra(service.PlatformOpenAI, req.Extra); err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -190,6 +195,12 @@ func (h *AccountHandler) importCodexSessions(ctx context.Context, req CodexSessi
 
 	seenIdentity := map[string]codexSeenIdentity{}
 	for _, entry := range entries {
+		if err := validateCodexImportRawDriverState(req.AccountDriverID, entry.Value); err != nil {
+			result.Failed++
+			result.Items = append(result.Items, CodexSessionImportItem{Index: entry.Index, Action: "failed", Message: err.Error()})
+			result.Errors = append(result.Errors, CodexSessionImportMessage{Index: entry.Index, Message: err.Error()})
+			continue
+		}
 		item, err := normalizeCodexImportEntry(entry)
 		if err != nil {
 			result.Failed++
@@ -226,7 +237,19 @@ func (h *AccountHandler) importCodexSessions(ctx context.Context, req CodexSessi
 			item.Credentials["expires_at"] = credentialExpiresAt.Format(time.RFC3339)
 		}
 		credentials := mergeCodexImportMap(item.Credentials, credentialExtras)
+		if err := service.ValidateAccountDriverForAccount(req.AccountDriverID, service.PlatformOpenAI, service.AccountTypeOAuth, credentials); err != nil {
+			result.Failed++
+			result.Errors = append(result.Errors, CodexSessionImportMessage{Index: entry.Index, Name: accountName, Message: err.Error()})
+			result.Items = append(result.Items, CodexSessionImportItem{Index: entry.Index, Name: accountName, Action: "failed", Message: err.Error()})
+			continue
+		}
 		extra := mergeCodexImportMap(req.Extra, item.Extra)
+		if err := service.ValidateAccountDriverState(&service.Account{AccountDriverID: req.AccountDriverID, Platform: service.PlatformOpenAI, Type: service.AccountTypeOAuth, Credentials: credentials, Extra: extra}); err != nil {
+			result.Failed++
+			result.Items = append(result.Items, CodexSessionImportItem{Index: entry.Index, Action: "failed", Message: err.Error()})
+			result.Errors = append(result.Errors, CodexSessionImportMessage{Index: entry.Index, Message: err.Error()})
+			continue
+		}
 		for _, warning := range item.WarningTexts {
 			result.Warnings = append(result.Warnings, CodexSessionImportMessage{
 				Index:   entry.Index,
@@ -255,6 +278,12 @@ func (h *AccountHandler) importCodexSessions(ctx context.Context, req CodexSessi
 
 		existing, matchedKey := index.Find(item.IdentityKeys, item.UserID)
 		if existing != nil && updateExisting {
+			if err := validateCodexImportRawDriverState(existing.EffectiveAccountDriverID(), entry.Value); err != nil {
+				result.Failed++
+				result.Items = append(result.Items, CodexSessionImportItem{Index: entry.Index, Action: "failed", Message: err.Error()})
+				result.Errors = append(result.Errors, CodexSessionImportMessage{Index: entry.Index, Message: err.Error()})
+				continue
+			}
 			if strings.HasPrefix(matchedKey, "account:") && item.UserID != "" &&
 				codexCredentialString(existing.Credentials, "chatgpt_user_id") == "" {
 				result.Warnings = append(result.Warnings, CodexSessionImportMessage{
@@ -275,8 +304,27 @@ func (h *AccountHandler) importCodexSessions(ctx context.Context, req CodexSessi
 				autoPauseOnExpired = nil
 			}
 			mergedCredentials := mergeCodexImportCredentials(existing.Credentials, credentials, item)
+			if err := service.ValidateAccountDriverUpdate(existing, req.AccountDriverID, nil); err != nil {
+				result.Failed++
+				result.Errors = append(result.Errors, CodexSessionImportMessage{Index: entry.Index, Name: accountName, Message: err.Error()})
+				continue
+			}
+			if err := service.ValidateAccountDriverForAccount(existing.EffectiveAccountDriverID(), existing.Platform, existing.Type, mergedCredentials); err != nil {
+				result.Failed++
+				result.Errors = append(result.Errors, CodexSessionImportMessage{Index: entry.Index, Name: accountName, Message: err.Error()})
+				continue
+			}
 			mergedExtra := mergeCodexImportMap(existing.Extra, extra)
+			candidate := *existing
+			candidate.Credentials, candidate.Extra = mergedCredentials, mergedExtra
+			if err := service.ValidateAccountDriverState(&candidate); err != nil {
+				result.Failed++
+				result.Items = append(result.Items, CodexSessionImportItem{Index: entry.Index, Action: "failed", Message: err.Error()})
+				result.Errors = append(result.Errors, CodexSessionImportMessage{Index: entry.Index, Message: err.Error()})
+				continue
+			}
 			updateInput := &service.UpdateAccountInput{
+				AccountDriverID:    req.AccountDriverID,
 				Credentials:        mergedCredentials,
 				Extra:              mergedExtra,
 				Concurrency:        req.Concurrency,
@@ -329,6 +377,7 @@ func (h *AccountHandler) importCodexSessions(ctx context.Context, req CodexSessi
 		}
 
 		account, createErr := h.adminService.CreateAccount(ctx, &service.CreateAccountInput{
+			AccountDriverID:       req.AccountDriverID,
 			Name:                  accountName,
 			Notes:                 req.Notes,
 			Platform:              service.PlatformOpenAI,
@@ -486,6 +535,39 @@ func flattenCodexImportValues(values []any) []any {
 		appendValue(value)
 	}
 	return out
+}
+
+// Native import keeps its historical normalization. For an enhanced binding,
+// explicit nonstandard auth hints must not disappear during that projection.
+func validateCodexImportRawDriverState(driverID string, value any) error {
+	if strings.TrimSpace(driverID) == "" || driverID == "native" {
+		return nil
+	}
+	raw, ok := value.(map[string]any)
+	if !ok {
+		return nil
+	}
+	maps := []map[string]any{raw}
+	for _, key := range []string{"tokens", "credentials", "extra"} {
+		if nested, ok := raw[key].(map[string]any); ok {
+			maps = append(maps, nested)
+		}
+	}
+	for _, values := range maps {
+		for _, key := range []string{"auth_mode", "authMode", "openai_auth_mode", "openaiAuthMode", "agent_identity", "agentIdentity"} {
+			mode, exists := values[key]
+			if !exists || mode == nil {
+				continue
+			}
+			if key == "agent_identity" || key == "agentIdentity" {
+				mode = service.OpenAIAuthModeAgentIdentity
+			}
+			if err := service.ValidateAccountDriverState(&service.Account{AccountDriverID: driverID, Platform: service.PlatformOpenAI, Type: service.AccountTypeOAuth, Credentials: map[string]any{"auth_mode": mode}}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func normalizeCodexImportEntry(entry codexImportEntry) (*codexImportAccount, error) {

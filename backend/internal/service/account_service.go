@@ -319,9 +319,26 @@ func (s *AccountService) ListByGroup(ctx context.Context, groupID int64) ([]Acco
 
 // Update 更新账号
 func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccountRequest) (*Account, error) {
+	ctx, releaseOperation, operationErr := AcquireAccountDriverOperation(ctx, id, "edit")
+	if operationErr != nil {
+		return nil, operationErr
+	}
+	defer releaseOperation()
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get account: %w", err)
+	}
+	if req.Credentials != nil || req.Extra != nil {
+		candidate := *account
+		if req.Credentials != nil {
+			candidate.Credentials = SanitizeStoredCredentials(account.Platform, *req.Credentials)
+		}
+		if req.Extra != nil {
+			candidate.Extra = *req.Extra
+		}
+		if err := ValidateAccountDriverState(&candidate); err != nil {
+			return nil, err
+		}
 	}
 
 	// 更新字段
@@ -410,6 +427,11 @@ func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccount
 // 优化：使用 ExistsByID 替代 GetByID 进行存在性检查，
 // 避免加载完整账号对象及其关联数据，提升删除操作的性能
 func (s *AccountService) Delete(ctx context.Context, id int64) error {
+	ctx, releaseOperation, operationErr := AcquireAccountDriverOperation(ctx, id, "delete")
+	if operationErr != nil {
+		return operationErr
+	}
+	defer releaseOperation()
 	// 使用轻量级的存在性检查，而非加载完整账号对象
 	exists, err := s.accountRepo.ExistsByID(ctx, id)
 	if err != nil {
@@ -465,6 +487,11 @@ func (s *AccountService) validateGroupIDsExist(ctx context.Context, groupIDs []i
 
 // UpdateStatus 更新账号状态
 func (s *AccountService) UpdateStatus(ctx context.Context, id int64, status string, errorMessage string) error {
+	ctx, releaseOperation, operationErr := AcquireAccountDriverOperation(ctx, id, "maintenance")
+	if operationErr != nil {
+		return operationErr
+	}
+	defer releaseOperation()
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("get account: %w", err)
@@ -482,6 +509,11 @@ func (s *AccountService) UpdateStatus(ctx context.Context, id int64, status stri
 
 // UpdateLastUsed 更新最后使用时间
 func (s *AccountService) UpdateLastUsed(ctx context.Context, id int64) error {
+	ctx, releaseOperation, operationErr := AcquireAccountDriverOperation(ctx, id, "maintenance")
+	if operationErr != nil {
+		return operationErr
+	}
+	defer releaseOperation()
 	if err := s.accountRepo.UpdateLastUsed(ctx, id); err != nil {
 		return fmt.Errorf("update last used: %w", err)
 	}

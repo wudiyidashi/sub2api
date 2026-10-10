@@ -105,12 +105,15 @@ backend/internal/web/dist/*
 
 # 后端运行时缓存数据
 backend/data/
+data/
 
 # ===================
 # 本地配置文件（包含敏感信息）
 # ===================
 backend/config.yaml
 deploy/config.yaml
+deploy/codex-proxy/config.yaml
+deploy/codex-proxy/runtime/
 backend/.installed
 
 # ===================

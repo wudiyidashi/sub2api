@@ -461,6 +461,47 @@ func (s *stubAdminService) ListAccountsForSchedulerScoreFilter(_ context.Context
 	return s.accounts, nil
 }
 
+func (s *stubAdminService) ListAccountsWithDriver(ctx context.Context, page, pageSize int, platform, accountType, status, search string, groupID int64, privacyMode, sortBy, sortOrder, driverID string) ([]service.Account, int64, error) {
+	if driverID == "" {
+		return s.ListAccounts(ctx, page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
+	}
+	filtered := make([]service.Account, 0, len(s.accounts))
+	for _, account := range s.accounts {
+		if account.EffectiveAccountDriverID() == driverID {
+			filtered = append(filtered, account)
+		}
+	}
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = len(filtered)
+	}
+	start := (page - 1) * pageSize
+	end := start + pageSize
+	if start >= len(filtered) {
+		return []service.Account{}, int64(len(filtered)), nil
+	}
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+	return filtered[start:end], int64(len(filtered)), nil
+}
+
+func (s *stubAdminService) ListAccountsForSchedulerScoreFilterWithDriver(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode, driverID string) ([]service.Account, error) {
+	accounts, err := s.ListAccountsForSchedulerScoreFilter(ctx, platform, accountType, status, search, groupID, privacyMode)
+	if err != nil || driverID == "" {
+		return accounts, err
+	}
+	filtered := make([]service.Account, 0, len(accounts))
+	for _, account := range accounts {
+		if account.EffectiveAccountDriverID() == driverID {
+			filtered = append(filtered, account)
+		}
+	}
+	return filtered, nil
+}
+
 func (s *stubAdminService) ListOpenAISchedulableAccountsForSchedulerScore(_ context.Context, groupID *int64) ([]service.Account, error) {
 	s.openAISchedulerScorePoolCalls++
 	accounts := s.openAISchedulerScorePoolAccounts

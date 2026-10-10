@@ -319,6 +319,14 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 						)
 						return
 					}
+					if !failoverErr.ShouldRetryNextAccount() {
+						reqLog.Info("openai.images.failover_stopped_by_upstream_policy",
+							zap.Int64("account_id", account.ID),
+							zap.Int("upstream_status", failoverErr.StatusCode),
+						)
+						h.handleFailoverExhausted(c, failoverErr, streamStarted)
+						return
+					}
 					if failoverErr.RetryableOnSameAccount {
 						retryLimit := effectiveSameAccountRetryLimit(failoverErr, account)
 						if sameAccountRetryAllowed(failoverErr, sameAccountRetryCount[account.ID], retryLimit) {

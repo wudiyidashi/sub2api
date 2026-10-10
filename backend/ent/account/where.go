@@ -90,6 +90,16 @@ func Type(v string) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldType, v))
 }
 
+// AccountDriverID applies equality check predicate on the "account_driver_id" field. It's identical to AccountDriverIDEQ.
+func AccountDriverID(v string) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldAccountDriverID, v))
+}
+
+// AccountDriverRevision applies equality check predicate on the "account_driver_revision" field. It's identical to AccountDriverRevisionEQ.
+func AccountDriverRevision(v int64) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldAccountDriverRevision, v))
+}
+
 // ProxyID applies equality check predicate on the "proxy_id" field. It's identical to ProxyIDEQ.
 func ProxyID(v int64) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldProxyID, v))
@@ -593,6 +603,111 @@ func TypeEqualFold(v string) predicate.Account {
 // TypeContainsFold applies the ContainsFold predicate on the "type" field.
 func TypeContainsFold(v string) predicate.Account {
 	return predicate.Account(sql.FieldContainsFold(FieldType, v))
+}
+
+// AccountDriverIDEQ applies the EQ predicate on the "account_driver_id" field.
+func AccountDriverIDEQ(v string) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldAccountDriverID, v))
+}
+
+// AccountDriverIDNEQ applies the NEQ predicate on the "account_driver_id" field.
+func AccountDriverIDNEQ(v string) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldAccountDriverID, v))
+}
+
+// AccountDriverIDIn applies the In predicate on the "account_driver_id" field.
+func AccountDriverIDIn(vs ...string) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldAccountDriverID, vs...))
+}
+
+// AccountDriverIDNotIn applies the NotIn predicate on the "account_driver_id" field.
+func AccountDriverIDNotIn(vs ...string) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldAccountDriverID, vs...))
+}
+
+// AccountDriverIDGT applies the GT predicate on the "account_driver_id" field.
+func AccountDriverIDGT(v string) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldAccountDriverID, v))
+}
+
+// AccountDriverIDGTE applies the GTE predicate on the "account_driver_id" field.
+func AccountDriverIDGTE(v string) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldAccountDriverID, v))
+}
+
+// AccountDriverIDLT applies the LT predicate on the "account_driver_id" field.
+func AccountDriverIDLT(v string) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldAccountDriverID, v))
+}
+
+// AccountDriverIDLTE applies the LTE predicate on the "account_driver_id" field.
+func AccountDriverIDLTE(v string) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldAccountDriverID, v))
+}
+
+// AccountDriverIDContains applies the Contains predicate on the "account_driver_id" field.
+func AccountDriverIDContains(v string) predicate.Account {
+	return predicate.Account(sql.FieldContains(FieldAccountDriverID, v))
+}
+
+// AccountDriverIDHasPrefix applies the HasPrefix predicate on the "account_driver_id" field.
+func AccountDriverIDHasPrefix(v string) predicate.Account {
+	return predicate.Account(sql.FieldHasPrefix(FieldAccountDriverID, v))
+}
+
+// AccountDriverIDHasSuffix applies the HasSuffix predicate on the "account_driver_id" field.
+func AccountDriverIDHasSuffix(v string) predicate.Account {
+	return predicate.Account(sql.FieldHasSuffix(FieldAccountDriverID, v))
+}
+
+// AccountDriverIDEqualFold applies the EqualFold predicate on the "account_driver_id" field.
+func AccountDriverIDEqualFold(v string) predicate.Account {
+	return predicate.Account(sql.FieldEqualFold(FieldAccountDriverID, v))
+}
+
+// AccountDriverIDContainsFold applies the ContainsFold predicate on the "account_driver_id" field.
+func AccountDriverIDContainsFold(v string) predicate.Account {
+	return predicate.Account(sql.FieldContainsFold(FieldAccountDriverID, v))
+}
+
+// AccountDriverRevisionEQ applies the EQ predicate on the "account_driver_revision" field.
+func AccountDriverRevisionEQ(v int64) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldAccountDriverRevision, v))
+}
+
+// AccountDriverRevisionNEQ applies the NEQ predicate on the "account_driver_revision" field.
+func AccountDriverRevisionNEQ(v int64) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldAccountDriverRevision, v))
+}
+
+// AccountDriverRevisionIn applies the In predicate on the "account_driver_revision" field.
+func AccountDriverRevisionIn(vs ...int64) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldAccountDriverRevision, vs...))
+}
+
+// AccountDriverRevisionNotIn applies the NotIn predicate on the "account_driver_revision" field.
+func AccountDriverRevisionNotIn(vs ...int64) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldAccountDriverRevision, vs...))
+}
+
+// AccountDriverRevisionGT applies the GT predicate on the "account_driver_revision" field.
+func AccountDriverRevisionGT(v int64) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldAccountDriverRevision, v))
+}
+
+// AccountDriverRevisionGTE applies the GTE predicate on the "account_driver_revision" field.
+func AccountDriverRevisionGTE(v int64) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldAccountDriverRevision, v))
+}
+
+// AccountDriverRevisionLT applies the LT predicate on the "account_driver_revision" field.
+func AccountDriverRevisionLT(v int64) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldAccountDriverRevision, v))
+}
+
+// AccountDriverRevisionLTE applies the LTE predicate on the "account_driver_revision" field.
+func AccountDriverRevisionLTE(v int64) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldAccountDriverRevision, v))
 }
 
 // ProxyIDEQ applies the EQ predicate on the "proxy_id" field.

@@ -8,6 +8,7 @@
             v-model:searchQuery="params.search"
             :filters="params"
             :groups="groups"
+            :drivers="accountDriverFilters"
             @update:filters="(newFilters) => Object.assign(params, newFilters)"
             @change="debouncedReload"
             @update:searchQuery="debouncedReload"
@@ -18,6 +19,7 @@
             @create="showCreate = true"
           >
             <template #after>
+              <button type="button" class="btn btn-secondary" @click="showDriverRuntime = true">{{ t('admin.accounts.accountDriver.runtime.title') }}</button>
               <!-- Auto Refresh Dropdown -->
               <div class="relative" ref="autoRefreshDropdownRef">
                 <button
@@ -284,6 +286,9 @@
               </div>
             </div>
           </template>
+          <template #cell-account_driver="{ row }">
+            <AccountDriverBadge :binding="row.account_driver" :maintenance="accountMaintenance.statuses.value[String(row.id)]" />
+          </template>
           <template #cell-capacity="{ row }">
             <AccountCapacityCell :account="row" />
           </template>
@@ -436,11 +441,11 @@
           </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center gap-1">
-              <button @click="handleEdit(row)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400">
+              <button :disabled="accountMaintenance.busy(row.id)" @click="handleEdit(row)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-dark-700 dark:hover:text-primary-400">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                 <span class="text-xs">{{ t('common.edit') }}</span>
               </button>
-              <button @click="handleDelete(row)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400">
+              <button :disabled="accountMaintenance.busy(row.id)" @click="handleDelete(row)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-dark-700 dark:hover:text-red-400">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
                 <span class="text-xs">{{ t('common.delete') }}</span>
               </button>
@@ -456,9 +461,10 @@
       <template #pagination><Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" /></template>
     </TablePageLayout>
     <CreateAccountModal :show="showCreate" :proxies="proxies" :groups="groups" @close="showCreate = false" @created="reload" />
-    <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountUpdated" />
-    <ReAuthAccountModal :show="showReAuth" :account="reAuthAcc" @close="closeReAuthModal" @reauthorized="handleAccountUpdated" />
-    <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" />
+    <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountUpdated" @maintenance="status => edAcc && accountMaintenance.update(status, edAcc.id)" />
+    <AccountDriverRuntimeModal :show="showDriverRuntime" @close="showDriverRuntime = false" @changed="handleDriverRuntimeChanged" />
+    <ReAuthAccountModal :show="showReAuth" :account="reAuthAcc" :maintenance-blocked="reAuthAcc ? accountMaintenance.busy(reAuthAcc.id) : false" @close="closeReAuthModal" @reauthorized="handleAccountUpdated" />
+    <AccountTestModal :show="showTest" :account="testingAcc" :maintenance-blocked="testingAcc ? accountMaintenance.busy(testingAcc.id) : false" @close="closeTestModal" />
     <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
     <ScheduledTestsPanel :show="showSchedulePanel" :account-id="scheduleAcc?.id ?? null" :model-options="scheduleModelOptions" @close="closeSchedulePanel" />
     <AccountActionMenu :show="menu.show" :account="menu.acc" :anchor-rect="menu.anchorRect" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" @create-spark-shadow="handleCreateSparkShadow" />
@@ -511,6 +517,11 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { CreateAccountModal, EditAccountModal, BulkEditAccountModal, SyncFromCrsModal, TempUnschedStatusModal } from '@/components/account'
 import AccountTableActions from '@/components/admin/account/AccountTableActions.vue'
 import AccountTableFilters from '@/components/admin/account/AccountTableFilters.vue'
+import AccountDriverBadge from '@/features/account-drivers/AccountDriverBadge.vue'
+import { useAccountDrivers } from '@/features/account-drivers/useAccountDrivers'
+import AccountDriverRuntimeModal from '@/features/account-drivers/AccountDriverRuntimeModal.vue'
+import { useAccountMaintenanceStatuses } from '@/features/account-drivers/useAccountMaintenanceStatuses'
+import { isAccountDriverMaintenanceActive } from '@/features/account-drivers/maintenance'
 import AccountBulkActionsBar from '@/components/admin/account/AccountBulkActionsBar.vue'
 import AccountActionMenu from '@/components/admin/account/AccountActionMenu.vue'
 import ImportDataModal from '@/components/admin/account/ImportDataModal.vue'
@@ -553,6 +564,16 @@ const accountGroupsForRow = (account: Pick<AccountListItem, 'group_ids'>): Admin
   return groupIDs.map(id => groupsByID.value.get(id)).filter((group): group is AdminGroup => Boolean(group))
 }
 const accountTableRef = ref<HTMLElement | null>(null)
+const { drivers: accountDrivers, load: loadAccountDrivers } = useAccountDrivers()
+const accountDriverFilters = computed(() => {
+  const knownDrivers = new Map<string, { id: string; name: string }>()
+  for (const driver of accountDrivers.value) knownDrivers.set(driver.id, driver)
+  for (const account of accounts.value) {
+    const driver = account.account_driver
+    if (driver && !knownDrivers.has(driver.id)) knownDrivers.set(driver.id, { id: driver.id, name: driver.name || driver.id })
+  }
+  return [...knownDrivers.values()]
+})
 const dataTableRef = ref<InstanceType<typeof DataTable> | null>(null)
 type AccountBulkEditTarget =
   | {
@@ -570,6 +591,7 @@ type AccountBulkEditTarget =
         group?: string
         search?: string
         privacy_mode?: string
+        account_driver_id?: string
         sort_by?: string
         sort_order?: AccountSortOrder
       }
@@ -600,6 +622,7 @@ const showImportData = ref(false)
 const showExportDataDialog = ref(false)
 const includeProxyOnExport = ref(true)
 const showBulkEdit = ref(false)
+const showDriverRuntime = ref(false)
 const bulkEditTarget = ref<AccountBulkEditTarget | null>(null)
 const showTempUnsched = ref(false)
 const showDeleteDialog = ref(false)
@@ -1086,6 +1109,7 @@ const {
   fetchFn: adminAPI.accounts.list,
   initialParams: {
     platform: '',
+    account_driver_id: '',
     type: '',
     status: '',
     privacy_mode: '',
@@ -1097,6 +1121,24 @@ const {
     sort_order: sortState.sort_order
   }
 })
+const accountMaintenance = useAccountMaintenanceStatuses(() => accounts.value.map(account => account.id))
+const handleDriverRuntimeChanged = () => { void loadAccountDrivers(); void reload(); void accountMaintenance.refresh() }
+const ensureAccountNotMaintaining = async (account: AccountListItem) => {
+  if (typeof adminAPI.accountDrivers?.getMaintenance === 'function') {
+    try {
+      const status = await adminAPI.accountDrivers.getMaintenance(account.id)
+      accountMaintenance.update(status, account.id)
+      if (!isAccountDriverMaintenanceActive(status)) return true
+    } catch (error: unknown) {
+      const status = (error as { status?: number; response?: { status?: number } }).status ?? (error as { response?: { status?: number } }).response?.status
+      if (status === 404) return true
+      appStore.showError(t('admin.accounts.accountDriver.maintenance.loadFailed'))
+      return false
+    }
+  } else if (!accountMaintenance.busy(account.id)) return true
+  appStore.showError(t('admin.accounts.accountDriver.maintenance.blockedHint'))
+  return false
+}
 
 const {
   selectedSet,
@@ -1188,6 +1230,7 @@ const buildUpstreamBillingRateFilters = () => {
     group: typeof rawParams.group === 'string' ? rawParams.group : '',
     search: typeof rawParams.search === 'string' ? rawParams.search : '',
     privacy_mode: typeof rawParams.privacy_mode === 'string' ? rawParams.privacy_mode : '',
+    account_driver_id: typeof rawParams.account_driver_id === 'string' ? rawParams.account_driver_id : '',
     sort_by: sortState.sort_by,
     sort_order: sortState.sort_order
   }
@@ -1391,6 +1434,7 @@ const inAutoRefreshSilentWindow = () => {
 const shouldReplaceAutoRefreshRow = (current: Account, next: Account) => {
   return (
     current.updated_at !== next.updated_at ||
+    JSON.stringify(current.account_driver) !== JSON.stringify(next.account_driver) ||
     current.current_concurrency !== next.current_concurrency ||
     current.current_window_cost !== next.current_window_cost ||
     current.active_sessions !== next.active_sessions ||
@@ -1455,6 +1499,7 @@ const refreshAccountsIncrementally = async () => {
         type?: string
         status?: string
         privacy_mode?: string
+        account_driver_id?: string
         group?: string
         search?: string
         sort_by?: string
@@ -1791,6 +1836,7 @@ const allColumns = computed(() => {
     { key: 'name', label: t('admin.accounts.columns.name'), sortable: true },
     { key: 'id', label: t('admin.accounts.columns.id'), sortable: true },
     { key: 'platform_type', label: t('admin.accounts.columns.platformType'), sortable: false },
+    { key: 'account_driver', label: t('admin.accounts.accountDriver.label'), sortable: false },
     { key: 'capacity', label: t('admin.accounts.columns.capacity'), sortable: false },
     { key: 'status', label: t('admin.accounts.columns.status'), sortable: true },
     { key: 'schedulable', label: t('admin.accounts.columns.schedulable'), sortable: true },
@@ -1843,6 +1889,7 @@ const loadAccountDetails = async (account: Pick<AccountListItem, 'id'>): Promise
 }
 
 const handleEdit = async (a: AccountListItem) => {
+  if (!await ensureAccountNotMaintaining(a)) return
   const account = await loadAccountDetails(a)
   if (!account) return
   edAcc.value = account
@@ -2060,6 +2107,7 @@ const buildBulkEditFilterSnapshot = () => {
     group: typeof rawParams.group === 'string' ? rawParams.group : '',
     search: typeof rawParams.search === 'string' ? rawParams.search : '',
     privacy_mode: typeof rawParams.privacy_mode === 'string' ? rawParams.privacy_mode : '',
+    account_driver_id: typeof rawParams.account_driver_id === 'string' ? rawParams.account_driver_id : '',
     sort_by: typeof rawParams.sort_by === 'string' ? rawParams.sort_by : '',
     sort_order: sortOrder
   }
@@ -2136,6 +2184,7 @@ const buildAccountQueryFilters = () => ({
   status: params.status || '',
   group: params.group || '',
   privacy_mode: params.privacy_mode || '',
+  account_driver_id: params.account_driver_id || '',
   search: params.search || '',
   sort_by: sortState.sort_by,
   sort_order: sortState.sort_order
@@ -2144,6 +2193,7 @@ const accountMatchesCurrentFilters = (account: Account) => {
   const filters = buildAccountQueryFilters()
   if (filters.platform && account.platform !== filters.platform) return false
   if (filters.type && account.type !== filters.type) return false
+  if (filters.account_driver_id && (account.account_driver?.id || 'native') !== filters.account_driver_id) return false
   if (filters.status) {
     const now = Date.now()
     const rateLimitResetAt = account.rate_limit_reset_at ? new Date(account.rate_limit_reset_at).getTime() : Number.NaN
@@ -2317,6 +2367,7 @@ const closeTestModal = () => { showTest.value = false; testingAcc.value = null }
 const closeStatsModal = () => { showStats.value = false; statsAcc.value = null }
 const closeReAuthModal = () => { showReAuth.value = false; reAuthAcc.value = null }
 const handleTest = async (a: AccountListItem) => {
+  if (!await ensureAccountNotMaintaining(a)) return
   const account = await loadAccountDetails(a)
   if (!account) return
   testingAcc.value = account
@@ -2329,6 +2380,7 @@ const handleViewStats = async (a: AccountListItem) => {
   showStats.value = true
 }
 const handleSchedule = async (a: Account) => {
+  if (!await ensureAccountNotMaintaining(a)) return
   scheduleAcc.value = a
   scheduleModelOptions.value = []
   showSchedulePanel.value = true
@@ -2340,9 +2392,10 @@ const handleSchedule = async (a: Account) => {
   }
 }
 const closeSchedulePanel = () => { showSchedulePanel.value = false; scheduleAcc.value = null; scheduleModelOptions.value = [] }
-const handleReAuth = (a: Account) => { reAuthAcc.value = a; showReAuth.value = true }
+const handleReAuth = async (a: Account) => { if (!await ensureAccountNotMaintaining(a)) return; reAuthAcc.value = a; showReAuth.value = true }
 const duplicatingAccountIDs = new Set<number>()
 const handleDuplicateAccount = async (a: Account) => {
+  if (!await ensureAccountNotMaintaining(a)) return
   if (duplicatingAccountIDs.has(a.id)) return
   duplicatingAccountIDs.add(a.id)
   try {
@@ -2357,6 +2410,7 @@ const handleDuplicateAccount = async (a: Account) => {
   }
 }
 const handleRefresh = async (a: Account) => {
+  if (!await ensureAccountNotMaintaining(a)) return
   try {
     const result = await adminAPI.accounts.refreshCredentials(a.id)
     patchAccountInList(result.account)
@@ -2367,6 +2421,7 @@ const handleRefresh = async (a: Account) => {
   }
 }
 const handleRecoverState = async (a: Account) => {
+  if (!await ensureAccountNotMaintaining(a)) return
   try {
     const updated = await adminAPI.accounts.recoverState(a.id)
     patchAccountInList(updated)
@@ -2378,6 +2433,7 @@ const handleRecoverState = async (a: Account) => {
   }
 }
 const handleResetQuota = async (a: Account) => {
+  if (!await ensureAccountNotMaintaining(a)) return
   try {
     const updated = await adminAPI.accounts.resetAccountQuota(a.id)
     patchAccountInList(updated)
@@ -2410,6 +2466,7 @@ const privacyResultMessageKey = (account: Account): { type: 'success' | 'error';
 }
 
 const handleSetPrivacy = async (a: Account) => {
+  if (!await ensureAccountNotMaintaining(a)) return
   try {
     const updated = await adminAPI.accounts.setPrivacy(a.id)
     patchAccountInList(updated)
@@ -2426,6 +2483,7 @@ const handleSetPrivacy = async (a: Account) => {
   }
 }
 const onRevertFallback = async (a: Account) => {
+  if (!await ensureAccountNotMaintaining(a)) return
   try {
     await adminAPI.accounts.revertProxyFallback(a.id)
     appStore.showSuccess(t('admin.accounts.revertProxySuccess'))
@@ -2435,13 +2493,15 @@ const onRevertFallback = async (a: Account) => {
     appStore.showError(error?.response?.data?.message || t('admin.accounts.revertProxyFailed'))
   }
 }
-const handleCreateSparkShadow = (a: Account) => {
+const handleCreateSparkShadow = async (a: Account) => {
+  if (!await ensureAccountNotMaintaining(a)) return
   creatingShadowAcc.value = a
   showCreateShadowDialog.value = true
 }
 const confirmCreateSparkShadow = async () => {
   const a = creatingShadowAcc.value
   if (!a) return
+  if (!await ensureAccountNotMaintaining(a)) return
   try {
     await adminAPI.accounts.createSparkShadow(a.id, { name: `${a.name} (Spark)` })
     showCreateShadowDialog.value = false
@@ -2453,9 +2513,10 @@ const confirmCreateSparkShadow = async () => {
     appStore.showError(error?.response?.data?.message || t('admin.accounts.createSparkShadowFailed'))
   }
 }
-const handleDelete = (a: Account) => { deletingAcc.value = a; showDeleteDialog.value = true }
-const confirmDelete = async () => { if(!deletingAcc.value) return; try { await adminAPI.accounts.delete(deletingAcc.value.id); showDeleteDialog.value = false; deletingAcc.value = null; reload() } catch (error) { console.error('Failed to delete account:', error) } }
+const handleDelete = async (a: Account) => { if (!await ensureAccountNotMaintaining(a)) return; deletingAcc.value = a; showDeleteDialog.value = true }
+const confirmDelete = async () => { if(!deletingAcc.value || !await ensureAccountNotMaintaining(deletingAcc.value)) return; try { await adminAPI.accounts.delete(deletingAcc.value.id); showDeleteDialog.value = false; deletingAcc.value = null; reload() } catch (error) { console.error('Failed to delete account:', error) } }
 const handleToggleSchedulable = async (a: Account) => {
+  if (!await ensureAccountNotMaintaining(a)) return
   const nextSchedulable = !a.schedulable
   togglingSchedulable.value = a.id
   try {
@@ -2539,6 +2600,7 @@ onMounted(async () => {
   }
 
   load()
+  void loadAccountDrivers()
   loadUpstreamBillingProbeGlobalState()
   const [proxiesResult, groupsResult] = await Promise.allSettled([
     adminAPI.proxies.getAll(),

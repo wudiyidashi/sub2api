@@ -1,15 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import {
   BUILTIN_PLATFORM_CATALOG,
   resetPlatformCatalog,
   setPlatformCatalog
 } from '@/constants/platformCatalog'
 
-const { updateAccountMock, checkMixedChannelRiskMock, authIsSimpleMode } = vi.hoisted(() => ({
+const { updateAccountMock, checkMixedChannelRiskMock, listDriversMock, authIsSimpleMode } = vi.hoisted(() => ({
   updateAccountMock: vi.fn(),
   checkMixedChannelRiskMock: vi.fn(),
+  listDriversMock: vi.fn(),
   authIsSimpleMode: { value: true }
 }))
 
@@ -35,6 +36,7 @@ vi.mock('@/api/admin', () => ({
       update: updateAccountMock,
       checkMixedChannelRisk: checkMixedChannelRiskMock
     },
+    accountDrivers: { list: listDriversMock },
     settings: {
       getWebSearchEmulationConfig: vi.fn().mockResolvedValue({ enabled: false, providers: [] }),
       getSettings: vi.fn().mockResolvedValue({})
@@ -60,6 +62,7 @@ vi.mock('vue-i18n', async () => {
 })
 
 import EditAccountModal from '../EditAccountModal.vue'
+import AccountDriverSelector from '@/features/account-drivers/AccountDriverSelector.vue'
 
 const BaseDialogStub = defineComponent({
   name: 'BaseDialog',
@@ -332,9 +335,125 @@ function mountModal(account = buildAccount(), renderGroupSelector = false) {
 describe('EditAccountModal', () => {
   beforeEach(() => {
     authIsSimpleMode.value = true
+    listDriversMock.mockReset().mockResolvedValue({ drivers: [], default_driver_id: 'native' })
   })
 
   afterEach(() => vi.useRealTimers())
+
+  it('preserves saved WebSocket settings on an HTTP-only runtime while keeping the enhanced binding read-only', async () => {
+    const account = buildOpenAIOAuthParentAccount()
+    account.account_driver = {
+      id: 'codex-rs-http', name: 'Codex HTTP/SSE', version: '1', available: true, binding_revision: 1,
+      lifecycle_driver_id: 'native', execution_driver_id: 'codex-rs-http', transport_protocols: ['http', 'sse'],
+      capabilities: { authorization: true, import: true, refresh: true, quota: true, test: true, models: true, settings: false, switch: false }
+    }
+    account.extra = { openai_oauth_responses_websockets_v2_mode: 'ctx_pool', openai_oauth_responses_websockets_v2_enabled: true }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    const selector = wrapper.getComponent(AccountDriverSelector)
+    expect(selector.props('readonly')).toBe(true)
+    expect(selector.props('modelValue')).toBe('codex-rs-http')
+    expect(wrapper.get('[data-testid="edit-openai-ws-mode-select"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="enhanced-ws-unavailable"]').text()).toBe('admin.accounts.accountDriver.websocketUnavailableHint')
+    await wrapper.get('form#edit-account-form input[type="text"]').setValue('Renamed enhanced account')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock.mock.calls[0]?.[1]).toMatchObject({
+      name: 'Renamed enhanced account',
+      extra: { openai_oauth_responses_websockets_v2_mode: 'ctx_pool', openai_oauth_responses_websockets_v2_enabled: true }
+    })
+    expect(updateAccountMock.mock.calls[0]?.[1]).not.toHaveProperty('account_driver_id')
+    wrapper.unmount()
+  })
+
+  it.each(['off', 'ctx_pool', 'passthrough', 'http_bridge'])('allows %s only after a ready enhanced WebSocket capability is loaded', async mode => {
+    const account = buildOpenAIOAuthParentAccount()
+    account.account_driver = {
+      id: 'codex-rs-http', name: 'Codex HTTP/SSE', version: 'old-http', available: true, binding_revision: 1,
+      transport_protocols: ['http', 'sse'], lifecycle_driver_id: 'native'
+    }
+    const driver = { ...account.account_driver, version: 'new-ws', transport_protocols: ['http', 'sse', 'websocket'], platforms: ['openai'], account_types: ['oauth'] }
+    listDriversMock.mockResolvedValue({ drivers: [driver], default_driver_id: 'native' })
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    await flushPromises()
+    const wsSelect = wrapper.get('[data-testid="edit-openai-ws-mode-select"]')
+    expect(wsSelect.attributes('disabled')).toBeUndefined()
+    expect(wrapper.getComponent(AccountDriverSelector).emitted('update:driver')?.at(-1)?.[0]).toMatchObject({ version: 'new-ws' })
+    await wsSelect.setValue(mode)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra).toMatchObject({
+      openai_oauth_responses_websockets_v2_mode: mode, openai_oauth_responses_websockets_v2_enabled: mode !== 'off'
+    })
+    wrapper.unmount()
+  })
+
+  it.each([
+    ['stopped WS runtime', true, false],
+    ['ready older HTTP runtime', false, true]
+  ])('preserves a saved WebSocket mode while editing other fields on a %s', async (_label, supportsWebSocket, available) => {
+    const account = buildOpenAIOAuthParentAccount()
+    account.account_driver = {
+      id: 'codex-rs-http', name: 'Codex enhanced', version: 'saved-ws', available: true, binding_revision: 1,
+      transport_protocols: ['http', 'sse', 'websocket'], lifecycle_driver_id: 'native'
+    }
+    account.extra = { openai_oauth_responses_websockets_v2_mode: 'passthrough', openai_oauth_responses_websockets_v2_enabled: true }
+    const driver = { ...account.account_driver, available, version: 'current', platforms: ['openai'], account_types: ['oauth'], transport_protocols: supportsWebSocket ? ['http', 'sse', 'websocket'] : ['http', 'sse'] }
+    listDriversMock.mockResolvedValue({ drivers: available ? [driver] : [], default_driver_id: 'native' })
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    await flushPromises()
+    const wsSelect = wrapper.get('[data-testid="edit-openai-ws-mode-select"]')
+    expect(wsSelect.attributes('disabled')).toBeDefined()
+    await wsSelect.setValue('off')
+    await wrapper.get('form#edit-account-form input[type="text"]').setValue('Updated ordinary field')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]).toMatchObject({ name: 'Updated ordinary field', extra: account.extra })
+    wrapper.unmount()
+  })
+
+  it('preserves legacy WebSocket flags when the enhanced runtime temporarily loses the capability', async () => {
+    const account = buildOpenAIOAuthParentAccount()
+    account.account_driver = { id: 'codex-rs-http', name: 'Codex enhanced', version: 'old', available: false, binding_revision: 1, transport_protocols: ['http', 'sse'] }
+    account.extra = { responses_websockets_v2_enabled: true, openai_ws_enabled: true }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    await flushPromises()
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra).toMatchObject(account.extra)
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra).not.toHaveProperty('openai_oauth_responses_websockets_v2_mode')
+    wrapper.unmount()
+  })
+
+  it('reacts to runtime capability loss while the edit panel stays open and preserves the saved mode on ordinary edits', async () => {
+    const account = buildOpenAIOAuthParentAccount()
+    account.account_driver = {
+      id: 'codex-rs-http', name: 'Codex enhanced', version: 'ws-version', available: true, binding_revision: 1,
+      transport_protocols: ['http', 'sse', 'websocket'], lifecycle_driver_id: 'native'
+    }
+    account.extra = { openai_oauth_responses_websockets_v2_mode: 'ctx_pool', openai_oauth_responses_websockets_v2_enabled: true }
+    const driver = { ...account.account_driver, platforms: ['openai'], account_types: ['oauth'] }
+    listDriversMock.mockResolvedValue({ drivers: [driver], default_driver_id: 'native' })
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    await flushPromises()
+    expect(wrapper.get('[data-testid="edit-openai-ws-mode-select"]').attributes('disabled')).toBeUndefined()
+    listDriversMock.mockResolvedValue({ drivers: [], default_driver_id: 'native' })
+    const stoppedAccount = { ...account, account_driver: { ...account.account_driver, available: false, version: 'stopped-version' } }
+    await wrapper.setProps({ account: stoppedAccount })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="edit-openai-ws-mode-select"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('form#edit-account-form input[type="text"]').setValue('Ordinary edit after runtime stop')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    expect(updateAccountMock.mock.calls[0]?.[1]).toMatchObject({ name: 'Ordinary edit after runtime stop', extra: account.extra })
+    expect(listDriversMock).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+  })
 
   it('passes existing non-identity mappings to the whitelist selector and preserves them on save', async () => {
     const account = buildAccount()

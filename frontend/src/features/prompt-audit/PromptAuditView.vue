@@ -54,6 +54,10 @@
             </template>
           </div>
 
+          <div v-show="activeTab === 'requests'" data-test="tab-panel-requests">
+            <RequestAuditWorkspace :active="activeTab === 'requests'" />
+          </div>
+
           <div v-show="activeTab === 'events'" data-test="tab-panel-events">
             <div
               v-if="draft?.enabled && !draft.store_pass_events"
@@ -155,6 +159,7 @@ import EndpointPool from './components/EndpointPool.vue'
 import PolicyPanel from './components/PolicyPanel.vue'
 import EventWorkspace from './components/EventWorkspace.vue'
 import EventDetailDialog from './components/EventDetailDialog.vue'
+import RequestAuditWorkspace from './components/RequestAuditWorkspace.vue'
 import FilterDeleteDialog from './components/FilterDeleteDialog.vue'
 import promptAuditAPI from './api'
 import type {
@@ -173,9 +178,10 @@ import { buildUpdateRequest, cloneData, configToDraft, draftFingerprint, emptyEv
 
 const { t, locale } = useI18n()
 const appStore = useAppStore()
-type PromptAuditPageTab = 'config' | 'events'
+type PromptAuditPageTab = 'config' | 'events' | 'requests'
 const activeTab = ref<PromptAuditPageTab>('events')
 const pageTabs = computed(() => [
+  { id: 'requests' as const, label: t('admin.promptAudit.tabs.requests') },
   { id: 'events' as const, label: t('admin.promptAudit.tabs.events') },
   { id: 'config' as const, label: t('admin.promptAudit.tabs.config') },
 ])
