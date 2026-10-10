@@ -150,7 +150,7 @@ def contexts(args):
         (dest / 'sub2api').chmod(0o755)
         shutil.copy2('Dockerfile.goreleaser', dest / 'Dockerfile')
         (dest / 'deploy').mkdir(exist_ok=True)
-        shutil.copy2('deploy/docker-entrypoint.sh', dest / 'deploy/docker-entrypoint.sh')
+        shutil.copy2('deploy/docker-entrypoint.account-drivers.sh', dest / 'deploy/docker-entrypoint.account-drivers.sh')
         shutil.copytree('backend/resources', dest / 'backend/resources', dirs_exist_ok=True)
         # Release images compile the pinned Codex driver for each target architecture.
         driver_ignore = shutil.ignore_patterns('target', '.git', '*.ps1', 'README.md', 'verification.md')
