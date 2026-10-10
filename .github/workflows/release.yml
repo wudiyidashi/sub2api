@@ -190,8 +190,48 @@ jobs:
             ~/.cache/go-build
           key: ${{ steps.go-cache.outputs.cache-primary-key }}
 
+  build-account-drivers:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+      - name: Prepare pinned Codex account-driver source
+        run: sh drivers/codex-rs/prepare-upstream.sh
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.0
+      - name: Install Rust driver build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake pkg-config libssl-dev protobuf-compiler git
+      - name: Build account driver
+        working-directory: drivers/codex-rs
+        run: cargo build --release --locked
+      - name: Collect account driver
+        run: |
+          mkdir -p driver-output
+          cp drivers/codex-rs/target/release/sub2api-codex-account-driver driver-output/sub2api-codex-account-driver
+          chmod 0755 driver-output/sub2api-codex-account-driver
+      - uses: actions/upload-artifact@v7
+        with:
+          name: account-driver-${{ matrix.arch }}
+          path: driver-output/sub2api-codex-account-driver
+          if-no-files-found: error
+          retention-days: 1
+
   release:
-    needs: [prepare, build-binaries]
+    needs: [prepare, build-binaries, build-account-drivers]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -216,15 +256,18 @@ jobs:
           pattern: release-binary-*
           path: release-input
           merge-multiple: true
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: account-driver-*
+          path: driver-input
+          merge-multiple: false
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - run: python -m pip install -r "$RUNNER_TEMP/release-tools/requirements-release.txt"
-      - name: Prepare pinned Codex account-driver source
-        run: sh drivers/codex-rs/prepare-upstream.sh
       - name: Verify complete matrix and prepare Docker contexts
         run: |
-          args=(--version "$RELEASE_VERSION" --sha "$RELEASE_SHA" --input release-input --output .release-context)
+          args=(--version "$RELEASE_VERSION" --sha "$RELEASE_SHA" --input release-input --drivers driver-input --output .release-context)
           if [[ "$SIMPLE_RELEASE" == true ]]; then args+=(--simple); fi
           python "$RUNNER_TEMP/release-tools/release_matrix.py" contexts "${args[@]}"
       - uses: actions/setup-go@v6

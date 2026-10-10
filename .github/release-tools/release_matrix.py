@@ -136,6 +136,7 @@ def verify(args):
 
 def contexts(args):
     verify(args)
+    driver_root = Path(args.drivers)
     for target in targets(args.simple):
         if target['goos'] != 'linux':
             continue
@@ -152,12 +153,13 @@ def contexts(args):
         (dest / 'deploy').mkdir(exist_ok=True)
         shutil.copy2('deploy/docker-entrypoint.account-drivers.sh', dest / 'deploy/docker-entrypoint.account-drivers.sh')
         shutil.copytree('backend/resources', dest / 'backend/resources', dirs_exist_ok=True)
-        # Release images compile the pinned Codex driver for each target architecture.
-        driver_ignore = shutil.ignore_patterns('target', '.git', '*.ps1', 'README.md', 'verification.md')
-        shutil.copytree('drivers/codex-rs', dest / 'drivers/codex-rs', dirs_exist_ok=True, ignore=driver_ignore)
-        proto = dest / 'backend/pkg/accountdriverapi/v1'
-        proto.mkdir(parents=True, exist_ok=True)
-        shutil.copy2('backend/pkg/accountdriverapi/v1/account_driver.proto', proto / 'account_driver.proto')
+        driver = driver_root / f"account-driver-{target['goarch']}" / 'sub2api-codex-account-driver'
+        if not driver.is_file():
+            raise ValueError(f'missing account driver artifact: {driver}')
+        driver_dest = dest / 'drivers/sub2api-codex-account-driver'
+        driver_dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(driver, driver_dest)
+        driver_dest.chmod(0o755)
 
 
 def main():
@@ -186,6 +188,7 @@ def main():
         p.add_argument('--simple', action='store_true')
         if command == 'contexts':
             p.add_argument('--output', required=True)
+            p.add_argument('--drivers', required=True)
         p.set_defaults(run=handler)
     args = parser.parse_args()
     args.run(args)

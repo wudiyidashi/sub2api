@@ -7,29 +7,7 @@
 # and arm64 images both include HTTP, SSE, and WebSocket account transport.
 # =============================================================================
 
-ARG RUST_IMAGE=rust:1.97-slim-bookworm
 ARG RUNTIME_IMAGE=postgres:18-bookworm
-
-FROM ${RUST_IMAGE} AS driver-builder
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    cmake \
-    pkg-config \
-    libssl-dev \
-    protobuf-compiler \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
-ENV CARGO_BUILD_JOBS=2
-WORKDIR /workspace/drivers/codex-rs
-COPY drivers/codex-rs/ ./
-COPY backend/pkg/accountdriverapi/v1/account_driver.proto /workspace/backend/pkg/accountdriverapi/v1/account_driver.proto
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/local/cargo/git \
-    --mount=type=cache,target=/workspace/drivers/codex-rs/target \
-    cargo build --release --locked \
-    && cp target/release/sub2api-codex-account-driver /sub2api-codex-account-driver
 
 FROM ${RUNTIME_IMAGE}
 
@@ -53,7 +31,7 @@ WORKDIR /app
 
 COPY --chown=sub2api:sub2api sub2api /app/sub2api
 COPY --chown=sub2api:sub2api backend/resources /app/resources
-COPY --from=driver-builder /sub2api-codex-account-driver /app/drivers/sub2api-codex-account-driver
+COPY drivers/sub2api-codex-account-driver /app/drivers/sub2api-codex-account-driver
 COPY deploy/docker-entrypoint.account-drivers.sh /app/docker-entrypoint.account-drivers.sh
 
 RUN chmod 0555 /app/sub2api /app/drivers/sub2api-codex-account-driver /app/docker-entrypoint.account-drivers.sh \
