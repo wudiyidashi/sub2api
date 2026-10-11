@@ -7,3 +7,7 @@
 - Unified content-audit request search with usage-style date, user, API key, account, group, model, platform, request ID, keyword, status, and sorting filters.
 - Added configurable GitHub release source through `UPDATE_GITHUB_REPO`, so panel updates and deployment scripts can use an operator-owned repository.
 - Full GitHub releases now publish amd64 and arm64 multi-architecture images with the enhanced Codex account driver included.
+### 2026-10-11
+
+- Panel software updates now refresh the managed Codex driver together with the gateway binary when the installation includes the enhanced driver.
+- Release images and update assets carry matching architecture-specific driver binaries with checksum verification and rollback support.

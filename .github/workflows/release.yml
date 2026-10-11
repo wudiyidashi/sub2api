@@ -270,6 +270,11 @@ jobs:
           args=(--version "$RELEASE_VERSION" --sha "$RELEASE_SHA" --input release-input --drivers driver-input --output .release-context)
           if [[ "$SIMPLE_RELEASE" == true ]]; then args+=(--simple); fi
           python "$RUNNER_TEMP/release-tools/release_matrix.py" contexts "${args[@]}"
+          for arch in amd64 arm64; do
+            if [[ "$SIMPLE_RELEASE" == true && "$arch" != amd64 ]]; then continue; fi
+            cp "driver-input/account-driver-$arch/sub2api-codex-account-driver" \
+              "release-input/sub2api-codex-account-driver_linux_$arch"
+          done
       - uses: actions/setup-go@v6
         with:
           go-version-file: backend/go.mod

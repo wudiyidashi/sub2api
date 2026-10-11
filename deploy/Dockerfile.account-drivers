@@ -28,7 +28,7 @@ COPY deploy/docker-entrypoint.account-drivers.sh /app/docker-entrypoint.account-
 RUN chmod 0555 /app/sub2api /app/drivers/sub2api-codex-account-driver /app/docker-entrypoint.account-drivers.sh \
     && sha256sum /app/drivers/sub2api-codex-account-driver | cut -d ' ' -f 1 > /app/drivers/codex-rs-http.sha256 \
     && chmod 0444 /app/drivers/codex-rs-http.sha256 \
-    && mkdir -p /app/data && chown sub2api:sub2api /app/data
+    && mkdir -p /app/data && chown -R sub2api:sub2api /app
 
 ENV ACCOUNT_DRIVERS_CODEX_RS_HTTP_ENABLED=true \
     ACCOUNT_DRIVERS_CODEX_RS_HTTP_EXECUTABLE_PATH=/app/drivers/sub2api-codex-account-driver \

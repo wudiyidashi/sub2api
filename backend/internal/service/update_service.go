@@ -187,15 +187,14 @@ func (s *UpdateService) PerformUpdate(ctx context.Context) error {
 	return s.applyReleaseAssets(ctx, info.ReleaseInfo.Assets)
 }
 
-// applyReleaseAssets downloads the platform archive from the given release assets,
-// verifies its checksum, and atomically swaps the running binary.
+// applyReleaseAssets downloads the platform archive and, when the running
+// installation contains the managed Codex driver, its matching architecture
+// driver asset. Both files are verified and swapped atomically.
 // Shared by PerformUpdate (latest) and RollbackToVersion (specific older version).
 func (s *UpdateService) applyReleaseAssets(ctx context.Context, releaseAssets []Asset) error {
-	// Find matching archive and checksum for current platform
 	archiveName := s.getArchiveName()
-	var downloadURL string
-	var checksumURL string
-
+	var downloadURL, checksumURL, driverURL string
+	driverAssetName := fmt.Sprintf("sub2api-codex-account-driver_%s_%s", runtime.GOOS, runtime.GOARCH)
 	for _, asset := range releaseAssets {
 		if strings.Contains(asset.Name, archiveName) && !strings.HasSuffix(asset.Name, ".txt") {
 			downloadURL = asset.DownloadURL
@@ -203,13 +202,13 @@ func (s *UpdateService) applyReleaseAssets(ctx context.Context, releaseAssets []
 		if asset.Name == "checksums.txt" {
 			checksumURL = asset.DownloadURL
 		}
+		if asset.Name == driverAssetName {
+			driverURL = asset.DownloadURL
+		}
 	}
-
 	if downloadURL == "" {
 		return fmt.Errorf("no compatible release found for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
-
-	// SECURITY: Validate download URL is from trusted domain
 	if err := validateDownloadURL(downloadURL); err != nil {
 		return fmt.Errorf("invalid download URL: %w", err)
 	}
@@ -218,8 +217,12 @@ func (s *UpdateService) applyReleaseAssets(ctx context.Context, releaseAssets []
 			return fmt.Errorf("invalid checksum URL: %w", err)
 		}
 	}
+	if driverURL != "" {
+		if err := validateDownloadURL(driverURL); err != nil {
+			return fmt.Errorf("invalid driver download URL: %w", err)
+		}
+	}
 
-	// Get current executable path
 	exePath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("failed to get executable path: %w", err)
@@ -228,70 +231,139 @@ func (s *UpdateService) applyReleaseAssets(ctx context.Context, releaseAssets []
 	if err != nil {
 		return fmt.Errorf("failed to resolve symlinks: %w", err)
 	}
-
 	exeDir := filepath.Dir(exePath)
-
-	// Create temp directory in the SAME directory as executable
-	// This ensures os.Rename is atomic (same filesystem)
 	tempDir, err := os.MkdirTemp(exeDir, ".sub2api-update-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
-	// Download archive
 	archivePath := filepath.Join(tempDir, filepath.Base(downloadURL))
 	if err := s.downloadFile(ctx, downloadURL, archivePath); err != nil {
 		return fmt.Errorf("download failed: %w", err)
 	}
-
-	// Verify checksum if available
 	if checksumURL != "" {
 		if err := s.verifyChecksum(ctx, archivePath, checksumURL); err != nil {
 			return fmt.Errorf("checksum verification failed: %w", err)
 		}
 	}
-
-	// Extract binary from archive
 	newBinaryPath := filepath.Join(tempDir, "sub2api")
 	if err := s.extractBinary(archivePath, newBinaryPath); err != nil {
 		return fmt.Errorf("extraction failed: %w", err)
 	}
-
-	// Set executable permission before replacement
 	if err := os.Chmod(newBinaryPath, 0755); err != nil {
 		return fmt.Errorf("chmod failed: %w", err)
 	}
 
-	// Atomic replacement using rename pattern:
-	// 1. Rename current -> backup (atomic on Unix)
-	// 2. Rename new -> current (atomic on Unix, same filesystem)
-	// If step 2 fails, restore backup
+	driverPath := s.driverExecutablePath()
+	if driverPath != "" && driverURL != "" {
+		newDriverPath := filepath.Join(tempDir, driverAssetName)
+		if err := s.downloadFile(ctx, driverURL, newDriverPath); err != nil {
+			return fmt.Errorf("driver download failed: %w", err)
+		}
+		if checksumURL != "" {
+			if err := s.verifyChecksum(ctx, newDriverPath, checksumURL); err != nil {
+				return fmt.Errorf("driver checksum verification failed: %w", err)
+			}
+		}
+		if err := os.Chmod(newDriverPath, 0755); err != nil {
+			return fmt.Errorf("driver chmod failed: %w", err)
+		}
+		if err := s.swapManagedFiles(exePath, newBinaryPath, driverPath, newDriverPath, tempDir); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	backupPath := exePath + ".backup"
-
-	// Remove old backup if exists
 	_ = os.Remove(backupPath)
-
-	// Step 1: Move current binary to backup
 	if err := os.Rename(exePath, backupPath); err != nil {
 		return fmt.Errorf("backup failed: %w", err)
 	}
-
-	// Step 2: Move new binary to target location (atomic, same filesystem)
 	if err := os.Rename(newBinaryPath, exePath); err != nil {
-		// Restore backup on failure
-		if restoreErr := os.Rename(backupPath, exePath); restoreErr != nil {
-			return fmt.Errorf("replace failed and restore failed: %w (restore error: %v)", err, restoreErr)
-		}
+		_ = os.Rename(backupPath, exePath)
 		return fmt.Errorf("replace failed (restored backup): %w", err)
 	}
-
-	// Success - backup file is kept for rollback capability
-	// It will be cleaned up on next successful update
 	return nil
 }
 
-// Rollback restores the previous version
+// swapManagedFiles replaces the gateway and managed driver in one operation.
+// A failed driver or checksum swap restores every file moved so far.
+func (s *UpdateService) swapManagedFiles(exePath, newBinaryPath, driverPath, newDriverPath, tempDir string) error {
+	backupPath := exePath + ".backup"
+	driverBackupPath := driverPath + ".backup"
+	shaPath := driverPath + ".sha256"
+	shaBackupPath := shaPath + ".backup"
+	_ = os.Remove(backupPath)
+	_ = os.Remove(driverBackupPath)
+	_ = os.Remove(shaBackupPath)
+
+	restore := func() {
+		_ = os.Remove(exePath)
+		_ = os.Rename(backupPath, exePath)
+		_ = os.Remove(driverPath)
+		_ = os.Rename(driverBackupPath, driverPath)
+		_ = os.Remove(shaPath)
+		_ = os.Rename(shaBackupPath, shaPath)
+	}
+	if err := os.Rename(exePath, backupPath); err != nil {
+		return fmt.Errorf("backup failed: %w", err)
+	}
+	if err := os.Rename(driverPath, driverBackupPath); err != nil {
+		restore()
+		return fmt.Errorf("driver backup failed: %w", err)
+	}
+	if _, err := os.Stat(shaPath); err == nil {
+		if err := os.Rename(shaPath, shaBackupPath); err != nil {
+			restore()
+			return fmt.Errorf("driver checksum backup failed: %w", err)
+		}
+	}
+	if err := os.Rename(newDriverPath, driverPath); err != nil {
+		restore()
+		return fmt.Errorf("driver replace failed: %w", err)
+	}
+	newHash, err := sha256File(driverPath)
+	if err != nil {
+		restore()
+		return fmt.Errorf("driver checksum calculation failed: %w", err)
+	}
+	newSHAPath := filepath.Join(tempDir, "codex-rs-http.sha256")
+	if err := os.WriteFile(newSHAPath, []byte(newHash+"\n"), 0644); err != nil {
+		restore()
+		return fmt.Errorf("driver checksum write failed: %w", err)
+	}
+	if err := os.Rename(newSHAPath, shaPath); err != nil {
+		restore()
+		return fmt.Errorf("driver checksum replace failed: %w", err)
+	}
+	if err := os.Rename(newBinaryPath, exePath); err != nil {
+		restore()
+		return fmt.Errorf("replace failed (restored backup): %w", err)
+	}
+	return nil
+}
+
+func (s *UpdateService) driverExecutablePath() string {
+	if runtime.GOOS != "linux" {
+		return ""
+	}
+	candidates := []string{strings.TrimSpace(os.Getenv("ACCOUNT_DRIVERS_CODEX_RS_HTTP_EXECUTABLE_PATH"))}
+	if exe, err := os.Executable(); err == nil {
+		candidates = append(candidates, filepath.Join(filepath.Dir(exe), "drivers", "sub2api-codex-account-driver"))
+	}
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+	}
+	return ""
+}
+
+// Rollback restores the previous gateway and managed driver versions.
 func (s *UpdateService) Rollback() error {
 	exePath, err := os.Executable()
 	if err != nil {
@@ -301,17 +373,31 @@ func (s *UpdateService) Rollback() error {
 	if err != nil {
 		return fmt.Errorf("failed to resolve symlinks: %w", err)
 	}
-
 	backupFile := exePath + ".backup"
 	if _, err := os.Stat(backupFile); os.IsNotExist(err) {
 		return fmt.Errorf("no backup found")
 	}
-
-	// Replace current with backup
+	if err := os.Remove(exePath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("rollback failed: %w", err)
+	}
 	if err := os.Rename(backupFile, exePath); err != nil {
 		return fmt.Errorf("rollback failed: %w", err)
 	}
-
+	if driverPath := s.driverExecutablePath(); driverPath != "" {
+		if backup := driverPath + ".backup"; fileExists(backup) {
+			_ = os.Remove(driverPath)
+			if err := os.Rename(backup, driverPath); err != nil {
+				return fmt.Errorf("driver rollback failed: %w", err)
+			}
+		}
+		shaPath := driverPath + ".sha256"
+		if backup := shaPath + ".backup"; fileExists(backup) {
+			_ = os.Remove(shaPath)
+			if err := os.Rename(backup, shaPath); err != nil {
+				return fmt.Errorf("driver checksum rollback failed: %w", err)
+			}
+		}
+	}
 	return nil
 }
 
@@ -603,6 +689,24 @@ func (s *UpdateService) extractBinary(archivePath, destPath string) error {
 		return err
 	}
 	return out.Close()
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func sha256File(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = f.Close() }()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 func (s *UpdateService) getFromCache(ctx context.Context) (*UpdateInfo, error) {

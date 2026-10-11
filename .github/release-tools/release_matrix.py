@@ -95,7 +95,8 @@ def generate_config(args):
         data['before'] = {'hooks': []}
         data['builds'] = [{'id': 'sub2api', 'skip': True}]
         data['archives'] = []
-        extra = [{'glob': 'release-input/sub2api_*.tar.gz'}, {'glob': 'release-input/sub2api_*.zip'}]
+        extra = [{'glob': 'release-input/sub2api_*.tar.gz'}, {'glob': 'release-input/sub2api_*.zip'},
+                 {'glob': 'release-input/sub2api-codex-account-driver_linux_*'}]
         if args.simple:
             data['checksum'] = {'disable': True}
         else:
@@ -136,7 +137,7 @@ def verify(args):
 
 def contexts(args):
     verify(args)
-    driver_root = Path(args.drivers)
+    driver_root = Path(getattr(args, 'drivers', '')) if getattr(args, 'drivers', '') else None
     for target in targets(args.simple):
         if target['goos'] != 'linux':
             continue
@@ -151,15 +152,19 @@ def contexts(args):
         (dest / 'sub2api').chmod(0o755)
         shutil.copy2('Dockerfile.goreleaser', dest / 'Dockerfile')
         (dest / 'deploy').mkdir(exist_ok=True)
-        shutil.copy2('deploy/docker-entrypoint.account-drivers.sh', dest / 'deploy/docker-entrypoint.account-drivers.sh')
+        entrypoint = Path('deploy/docker-entrypoint.account-drivers.sh')
+        if not entrypoint.exists():
+            entrypoint = Path('deploy/docker-entrypoint.sh')
+        shutil.copy2(entrypoint, dest / 'deploy' / entrypoint.name)
         shutil.copytree('backend/resources', dest / 'backend/resources', dirs_exist_ok=True)
-        driver = driver_root / f"account-driver-{target['goarch']}" / 'sub2api-codex-account-driver'
-        if not driver.is_file():
-            raise ValueError(f'missing account driver artifact: {driver}')
-        driver_dest = dest / 'drivers/sub2api-codex-account-driver'
-        driver_dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(driver, driver_dest)
-        driver_dest.chmod(0o755)
+        if driver_root is not None:
+            driver = driver_root / f"account-driver-{target['goarch']}" / 'sub2api-codex-account-driver'
+            if not driver.is_file():
+                raise ValueError(f'missing account driver artifact: {driver}')
+            driver_dest = dest / 'drivers/sub2api-codex-account-driver'
+            driver_dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(driver, driver_dest)
+            driver_dest.chmod(0o755)
 
 
 def main():
@@ -188,7 +193,7 @@ def main():
         p.add_argument('--simple', action='store_true')
         if command == 'contexts':
             p.add_argument('--output', required=True)
-            p.add_argument('--drivers', required=True)
+            p.add_argument('--drivers', default='')
         p.set_defaults(run=handler)
     args = parser.parse_args()
     args.run(args)
