@@ -33,6 +33,7 @@ Please read the following carefully before using this project:
 
 - Enhanced Codex HTTP/SSE failures now show network diagnostic categories in administrator error details, making connection, proxy, and TLS failures easier to investigate.
 - Fixed the enhanced driver failing to start in GitHub release images on systems with older libraries.
+- Codex Responses requests now use the official zstd request encoding before the managed upstream transport.
 
 完整更新记录见 [docs/releases/release-notes.md](docs/releases/release-notes.md)。
 

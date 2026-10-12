@@ -18,3 +18,4 @@
 - Enhanced Codex HTTP/SSE failures now show network diagnostic categories such as connection timeout, DNS, proxy, TLS, and connection reset in administrator error details.
 - Preserved driver failure messages across the gateway while keeping credentials out of diagnostic messages and retaining the sending state used to prevent duplicate requests.
 - Fixed the enhanced driver failing to start in GitHub release images due to incompatible system libraries; both architectures now build against the release runtime and check driver loading before publication.
+- Codex Responses requests now use the official zstd request encoding before the managed upstream transport.

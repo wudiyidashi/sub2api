@@ -1,7 +1,12 @@
 //! 宿主准备请求的 CPR HTTP/SSE 驱动，认证与账号管理仍由 Sub2API 持有
 
 use std::{
-    collections::HashSet, env, error::Error as StdError, io::Write, pin::Pin, time::Duration,
+    collections::HashSet,
+    env,
+    error::Error as StdError,
+    io::{Cursor, Write},
+    pin::Pin,
+    time::Duration,
 };
 
 use futures::{Stream, StreamExt};
@@ -11,7 +16,7 @@ use provider_openai::transport::{
     client::build_account_http_client_with_timeout,
     profile::{CodexWireProfile, CodexWireProfileState},
 };
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use reqwest::header::{CONTENT_ENCODING, CONTENT_LENGTH, HeaderMap, HeaderName, HeaderValue};
 use tokio::{
     io::AsyncReadExt,
     net::TcpListener,
@@ -399,7 +404,7 @@ impl Runner {
             .await;
             return;
         }
-        let headers = match request_headers(&start.headers, &identity.protected_headers) {
+        let mut headers = match request_headers(&start.headers, &identity.protected_headers) {
             Ok(v) => v,
             Err(message) => {
                 fail(&tx, &cancel, SendState::NotSent, "invalid_headers", message).await;
@@ -442,12 +447,33 @@ impl Runner {
                 return;
             }
         };
-        let mut outbound = match client
-            .post(url.clone())
-            .headers(headers)
-            .body(start.body)
-            .build()
-        {
+        let mut body = start.body;
+        let codex_responses = url.scheme() == "https"
+            && url.host_str() == Some("chatgpt.com")
+            && matches!(
+                url.path(),
+                "/codex/responses" | "/backend-api/codex/responses"
+            );
+        if codex_responses {
+            body = match zstd::stream::encode_all(Cursor::new(body), 3) {
+                Ok(value) => value,
+                Err(_) => {
+                    fail(
+                        &tx,
+                        &cancel,
+                        SendState::NotSent,
+                        "request_compression",
+                        "Codex request compression failed",
+                    )
+                    .await;
+                    return;
+                }
+            };
+            headers.remove(CONTENT_LENGTH);
+            headers.remove(CONTENT_ENCODING);
+            headers.insert(CONTENT_ENCODING, HeaderValue::from_static("zstd"));
+        }
+        let mut outbound = match client.post(url.clone()).headers(headers).body(body).build() {
             Ok(v) => v,
             Err(_) => {
                 fail(
