@@ -1,11 +1,13 @@
 //! 宿主准备请求的 CPR HTTP/SSE 驱动，认证与账号管理仍由 Sub2API 持有
 
-use std::{collections::HashSet, env, io::Write, pin::Pin, time::Duration};
+use std::{
+    collections::HashSet, env, error::Error as StdError, io::Write, pin::Pin, time::Duration,
+};
 
 use futures::{Stream, StreamExt};
 use gateway_core::account::OutboundProxy;
 use provider_openai::transport::{
-    CodexBackendClient,
+    CodexBackendClient, CodexClientError,
     client::build_account_http_client_with_timeout,
     profile::{CodexWireProfile, CodexWireProfileState},
 };
@@ -33,6 +35,88 @@ use wire::{
 const MAX_BODY_BYTES: usize = 256 * 1024 * 1024;
 const BODY_CHUNK_BYTES: usize = 64 * 1024;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
+// Only fixed diagnostic labels and OS error codes cross the RPC boundary.
+// Network error strings can contain the URL or proxy credentials.
+fn http_transport_diagnostic(error: &reqwest::Error) -> String {
+    let phase = if error.is_connect() {
+        "connect"
+    } else {
+        "request"
+    };
+    let mut causes = Vec::new();
+    if error.is_timeout() {
+        causes.push("timeout".to_string());
+    }
+    let mut source = error.source();
+    for _ in 0..12 {
+        let Some(current) = source else { break };
+        let message = current.to_string().to_ascii_lowercase();
+        let label = if message.contains("dns")
+            || message.contains("resolve")
+            || message.contains("name or service not known")
+        {
+            Some("DNS resolution failed")
+        } else if message.contains("certificate") {
+            Some("TLS certificate failed")
+        } else if message.contains("tls") || message.contains("ssl") {
+            Some("TLS handshake failed")
+        } else if message.contains("authentication")
+            || message.contains("unauthorized")
+            || message.contains("407")
+        {
+            Some("proxy authentication failed")
+        } else if message.contains("socks")
+            || message.contains("proxy")
+            || message.contains("tunnel")
+        {
+            Some("proxy connection failed")
+        } else if message.contains("http2")
+            || message.contains("http/2")
+            || message.starts_with("h2 ")
+        {
+            Some("HTTP/2 connection failed")
+        } else if message.contains("connection closed") || message.contains("incomplete message") {
+            Some("connection closed before headers")
+        } else {
+            None
+        };
+        if let Some(label) = label {
+            causes.push(label.to_string());
+        }
+        if let Some(io_error) = current.downcast_ref::<std::io::Error>() {
+            causes.push(format!("io={:?}", io_error.kind()));
+            if let Some(code) = io_error.raw_os_error() {
+                causes.push(format!("os_error={code}"));
+            }
+        }
+        source = current.source();
+    }
+    causes.sort();
+    causes.dedup();
+    if causes.is_empty() {
+        causes.push("network transport failed".into());
+    }
+    format!("upstream HTTP {phase} failed: {}", causes.join(", "))
+}
+
+fn transport_diagnostic(error: CodexClientError) -> String {
+    match error {
+        CodexClientError::Http(error) => http_transport_diagnostic(&error),
+        CodexClientError::ConnectionBudgetExhausted => {
+            "upstream connection budget exhausted".into()
+        }
+        _ => "upstream HTTP transport initialization failed".into(),
+    }
+}
+
+fn task_diagnostic(error: tokio::task::JoinError) -> String {
+    if error.is_panic() {
+        "upstream HTTP transport task panicked".into()
+    } else {
+        "upstream HTTP transport task cancelled".into()
+    }
+}
 
 #[derive(Clone)]
 struct Runner {
@@ -423,7 +507,7 @@ impl Runner {
         enum HeaderResult {
             Response(reqwest::Response),
             Timeout,
-            Transport,
+            Transport(String),
         }
         let mut request_task =
             tokio::spawn(async move { transport.execute_prepared_http(outbound).await });
@@ -441,7 +525,8 @@ impl Runner {
                     &mut request_task,
                 ) => match result {
                     Ok(Ok(Ok(response))) => HeaderResult::Response(response),
-                    Ok(Ok(Err(_))) | Ok(Err(_)) => HeaderResult::Transport,
+                    Ok(Ok(Err(error))) => HeaderResult::Transport(transport_diagnostic(error)),
+                    Ok(Err(error)) => HeaderResult::Transport(task_diagnostic(error)),
                     Err(_) => {
                         request_task.abort();
                         let _ = request_task.await;
@@ -459,7 +544,8 @@ impl Runner {
                 },
                 result = &mut request_task => match result {
                     Ok(Ok(response)) => HeaderResult::Response(response),
-                    Ok(Err(_)) | Err(_) => HeaderResult::Transport,
+                    Ok(Err(error)) => HeaderResult::Transport(transport_diagnostic(error)),
+                    Err(error) => HeaderResult::Transport(task_diagnostic(error)),
                 },
             }
         };
@@ -476,13 +562,13 @@ impl Runner {
                 .await;
                 return;
             }
-            HeaderResult::Transport => {
+            HeaderResult::Transport(message) => {
                 fail(
                     &tx,
                     &cancel,
                     SendState::Ambiguous,
                     "upstream_transport",
-                    "upstream transport failed after send permission",
+                    &message,
                 )
                 .await;
                 return;
@@ -540,13 +626,13 @@ impl Runner {
                         }
                     }
                 }
-                Some(Err(_)) => {
+                Some(Err(error)) => {
                     fail(
                         &tx,
                         &cancel,
                         SendState::Sent,
                         "upstream_stream",
-                        "upstream response stream ended with a transport error",
+                        &http_transport_diagnostic(&error),
                     )
                     .await;
                     return;

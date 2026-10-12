@@ -54,11 +54,18 @@ type Info struct {
 // Error carries the host's conservative sending watermark, not a network guess.
 type Error struct {
 	Code      string
+	Message   string
 	SendState api.SendState
 	Cause     error
 }
 
-func (e *Error) Error() string     { return "account driver: " + e.Code }
+func (e *Error) Error() string {
+	message := "account driver: " + e.Code
+	if detail := safeFailureMessage(e.Message); detail != "" {
+		message += ": " + detail
+	}
+	return message
+}
 func (e *Error) Unwrap() error     { return e.Cause }
 func (e *Error) RequestSent() bool { return e.SendState != api.SendState_SEND_STATE_NOT_SENT }
 
@@ -436,7 +443,7 @@ func (c *Client) RoundTripWithObserverTimeout(request *http.Request, proxyURL st
 			return &http.Response{StatusCode: statusCode, Status: fmt.Sprintf("%d %s", statusCode, http.StatusText(statusCode)), Header: headers, Body: responseBody, ContentLength: -1, Proto: protocol, ProtoMajor: major, ProtoMinor: minor, Request: request}, nil
 		case *api.ExecuteEvent_Failure:
 			cleanup()
-			return nil, &Error{Code: safeFailureCode(frame.Failure.Code, "attempt_failed"), SendState: api.SendState(state.Load())}
+			return nil, &Error{Code: safeFailureCode(frame.Failure.Code, "attempt_failed"), Message: safeFailureMessage(frame.Failure.GetMessage()), SendState: api.SendState(state.Load())}
 		default:
 			cleanup()
 			return nil, &Error{Code: "invalid_event_before_headers", SendState: api.SendState(state.Load())}
@@ -488,7 +495,7 @@ func receiveBody(stream grpc.BidiStreamingClient[api.ExecuteCommand, api.Execute
 		case *api.ExecuteEvent_End:
 			return
 		case *api.ExecuteEvent_Failure:
-			_ = writer.CloseWithError(&Error{Code: "upstream_stream_failed", SendState: api.SendState_SEND_STATE_SENT})
+			_ = writer.CloseWithError(&Error{Code: "upstream_stream_failed", Message: safeFailureMessage(frame.Failure.GetMessage()), SendState: api.SendState_SEND_STATE_SENT})
 			return
 		default:
 			_ = writer.CloseWithError(&Error{Code: "invalid_response_event", SendState: api.SendState_SEND_STATE_SENT})

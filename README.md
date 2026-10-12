@@ -29,9 +29,9 @@ Please read the following carefully before using this project:
 
 ## 最新更新
 
-### 2026-10-11
+### 2026-10-12
 
-- Panel software updates now refresh the enhanced Codex driver together with the gateway binary, with architecture-specific assets, checksum verification, and rollback support.
+- Enhanced Codex HTTP/SSE failures now show network diagnostic categories in administrator error details, making connection, proxy, and TLS failures easier to investigate.
 
 完整更新记录见 [docs/releases/release-notes.md](docs/releases/release-notes.md)。
 
