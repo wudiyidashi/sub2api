@@ -10,6 +10,7 @@ WORKDIR /workspace/backend
 COPY --from=host-go go.mod go.sum ./
 COPY --from=host-api . ./pkg/accountdriverapi/v1/
 COPY --from=host-go internal/accountdriver/runner ./internal/accountdriver/runner/
+COPY --from=host-go internal/util/logredact ./internal/util/logredact/
 COPY --from=rust-build /workspace/drivers/codex-rs/upstream-lock.json /workspace/drivers/codex-rs/upstream-lock.json
 COPY --from=rust-build /sub2api-codex-account-driver /usr/local/bin/sub2api-codex-account-driver
 ENV SUB2API_CODEX_DRIVER_BINARY=/usr/local/bin/sub2api-codex-account-driver

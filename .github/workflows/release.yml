@@ -208,21 +208,23 @@ jobs:
           ref: ${{ needs.prepare.outputs.sha }}
       - name: Prepare pinned Codex account-driver source
         run: sh drivers/codex-rs/prepare-upstream.sh
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.97.0
-      - name: Install Rust driver build dependencies
+      - name: Build native driver with Bookworm runtime compatibility
+        env:
+          DRIVER_ARCH: ${{ matrix.arch }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential cmake pkg-config libssl-dev protobuf-compiler git
-      - name: Build account driver
-        working-directory: drivers/codex-rs
-        run: cargo build --release --locked
-      - name: Collect account driver
+          docker build --platform "linux/$DRIVER_ARCH" \
+            -f deploy/Dockerfile.account-driver-build \
+            --target driver-export --output type=local,dest=driver-output .
+      - name: Verify driver loads in the release runtime
         run: |
-          mkdir -p driver-output
-          cp drivers/codex-rs/target/release/sub2api-codex-account-driver driver-output/sub2api-codex-account-driver
-          chmod 0755 driver-output/sub2api-codex-account-driver
+          docker run --rm --network none --entrypoint /bin/sh \
+            -v "$PWD/driver-output:/driver:ro" postgres:18-bookworm -c '
+              set +e
+              output=$(/driver/sub2api-codex-account-driver 2>&1)
+              result=$?
+              printf "%s\n" "$output"
+              test "$result" -eq 1 && test "$output" = "Error: NotPresent"
+            '
       - uses: actions/upload-artifact@v7
         with:
           name: account-driver-${{ matrix.arch }}
