@@ -98,8 +98,23 @@ func (r *apiRequestAuditRepository) prune(ctx context.Context, tx *sql.Tx, incom
 	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1)`, apiRequestAuditStorageLockID); err != nil {
 		return err
 	}
+	// 存量超预算时交给分批清理，避免每次业务请求都尝试删除整张历史大表。
+	if incoming > 0 {
+		var current int64
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(`+apiRequestAuditStoredBytesSQL+`),0) FROM api_request_audit_payloads`).Scan(&current); err != nil {
+			return err
+		}
+		if current > r.maxStoredBytes {
+			return fmt.Errorf("api request audit storage is awaiting retention cleanup")
+		}
+	}
+	expiryLimit, capacityLimit := "", ""
+	if incoming == 0 {
+		expiryLimit = " ORDER BY created_at, id LIMIT 100"
+		capacityLimit = " ORDER BY bytes_before, request_id LIMIT 100"
+	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM api_request_audit_payloads WHERE request_id IN (
-		SELECT request_id FROM api_request_audit_payloads WHERE created_at < $1
+		SELECT request_id FROM api_request_audit_payloads WHERE created_at < $1`+expiryLimit+`
 	)`, time.Now().UTC().Add(-r.retention)); err != nil {
 		return err
 	}
@@ -120,7 +135,7 @@ func (r *apiRequestAuditRepository) prune(ctx context.Context, tx *sql.Tx, incom
 		SELECT request_id, COALESCE(SUM(stored_bytes) OVER (
 			ORDER BY created_at, first_id ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING),0) AS bytes_before
 		FROM requests
-	) DELETE FROM api_request_audit_payloads WHERE request_id IN (SELECT request_id FROM oldest WHERE bytes_before < $1)`, excess)
+	) DELETE FROM api_request_audit_payloads WHERE request_id IN (SELECT request_id FROM oldest WHERE bytes_before < $1`+capacityLimit+`)`, excess)
 	return err
 }
 
@@ -128,15 +143,35 @@ func (r *apiRequestAuditRepository) CleanupAPIRequestAuditPayloads(ctx context.C
 	if r == nil || r.db == nil {
 		return fmt.Errorf("nil api request audit repository")
 	}
+	for ctx.Err() == nil {
+		more, err := r.cleanupBatch(ctx)
+		if err != nil || !more {
+			return err
+		}
+	}
+	return ctx.Err()
+}
+
+// 每批提交释放锁和旧版本，取消只回滚当前小批次，已完成的清理无需重做。
+func (r *apiRequestAuditRepository) cleanupBatch(ctx context.Context) (bool, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer func() { _ = tx.Rollback() }()
 	if err := r.prune(ctx, tx, 0); err != nil {
-		return err
+		return false, err
 	}
-	return tx.Commit()
+	var more bool
+	err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM api_request_audit_payloads WHERE created_at < $1)
+		OR (SELECT COALESCE(SUM(`+apiRequestAuditStoredBytesSQL+`),0) FROM api_request_audit_payloads) > $2`, time.Now().UTC().Add(-r.retention), r.maxStoredBytes).Scan(&more)
+	if err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return more, nil
 }
 
 func (r *apiRequestAuditRepository) ListAPIRequestAuditPayloads(ctx context.Context, requestID string) ([]*service.APIRequestAuditPayload, error) {

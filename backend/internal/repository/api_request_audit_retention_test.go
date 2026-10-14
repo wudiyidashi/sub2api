@@ -33,6 +33,7 @@ func TestAPIRequestAuditRetentionAndEvictionRollBackOnInsertFailure(t *testing.T
 	repo := &apiRequestAuditRepository{db: db, retention: 24 * time.Hour, maxStoredBytes: 1000}
 	mock.ExpectBegin()
 	mock.ExpectExec("SELECT pg_advisory_xact_lock").WithArgs(apiRequestAuditStorageLockID).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery("SELECT COALESCE\\(SUM").WillReturnRows(sqlmock.NewRows([]string{"bytes"}).AddRow(950))
 	mock.ExpectExec("DELETE FROM api_request_audit_payloads WHERE request_id IN").WithArgs(sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery("SELECT COALESCE\\(SUM").WillReturnRows(sqlmock.NewRows([]string{"bytes"}).AddRow(950))
 	mock.ExpectExec("WITH requests AS").WithArgs(sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, 1))
@@ -41,6 +42,18 @@ func TestAPIRequestAuditRetentionAndEvictionRollBackOnInsertFailure(t *testing.T
 	err := repo.InsertAPIRequestAuditPayloads(context.Background(), []*service.APIRequestAuditPayload{{RequestID: "test", Direction: service.APIRequestAuditDirectionClientRequest, Body: []byte("body")}})
 	require.ErrorContains(t, err, "insert failed")
 	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAPIRequestAuditBacklogDoesNotTriggerLargeDeleteOnWrite(t *testing.T) {
+	db, mock := newSQLMock(t)
+	repo := &apiRequestAuditRepository{db: db, retention: 24 * time.Hour, maxStoredBytes: 1000}
+	mock.ExpectBegin()
+	mock.ExpectExec("SELECT pg_advisory_xact_lock").WithArgs(apiRequestAuditStorageLockID).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery("SELECT COALESCE\\(SUM").WillReturnRows(sqlmock.NewRows([]string{"bytes"}).AddRow(1001))
+	mock.ExpectRollback()
+	err := repo.InsertAPIRequestAuditPayloads(context.Background(), []*service.APIRequestAuditPayload{{RequestID: "new", Body: []byte("body")}})
+	require.ErrorContains(t, err, "awaiting retention cleanup")
+	require.NoError(t, mock.ExpectationsWereMet(), "large historical cleanup must stay off the write path")
 }
 
 func TestAPIRequestAuditCleanupUsesDefaultsAndDoesNotTouchUsage(t *testing.T) {
@@ -53,6 +66,7 @@ func TestAPIRequestAuditCleanupUsesDefaultsAndDoesNotTouchUsage(t *testing.T) {
 	mock.ExpectExec("SELECT pg_advisory_xact_lock").WithArgs(apiRequestAuditStorageLockID).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("DELETE FROM api_request_audit_payloads WHERE request_id IN").WithArgs(sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery("SELECT COALESCE\\(SUM").WillReturnRows(sqlmock.NewRows([]string{"bytes"}).AddRow(0))
+	mock.ExpectQuery("SELECT EXISTS").WithArgs(sqlmock.AnyArg(), repo.maxStoredBytes).WillReturnRows(sqlmock.NewRows([]string{"more"}).AddRow(false))
 	mock.ExpectCommit()
 	require.NoError(t, repo.CleanupAPIRequestAuditPayloads(context.Background()))
 	require.NoError(t, mock.ExpectationsWereMet())
