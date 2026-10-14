@@ -3,11 +3,12 @@ package service
 import (
 	"bytes"
 	"context"
-	"github.com/Wei-Shaw/sub2api/internal/accountdriver"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"io"
 	"net/http"
 	"sync"
+
+	"github.com/Wei-Shaw/sub2api/internal/accountdriver"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 )
 
 func (s *OpenAIGatewayService) SetPluginManager(manager *PluginManager) {
@@ -57,14 +58,14 @@ func (s *OpenAIGatewayService) doOpenAIUpstream(request *http.Request, proxyURL 
 }
 
 func recordAPIRequestAuditUpstreamRequest(request *http.Request) {
-	if request == nil || request.GetBody == nil {
+	if request == nil || request.GetBody == nil || auditCaptureFromContext(request.Context()) == nil {
 		return
 	}
 	body, err := request.GetBody()
 	if err != nil || body == nil {
 		return
 	}
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 	raw, _ := io.ReadAll(io.LimitReader(body, MaxAPIRequestAuditBodyBytes+1))
 	CaptureAPIRequestAuditPayload(request.Context(), &APIRequestAuditPayload{
 		RequestID: contextAuditRequestID(request.Context()), ClientRequestID: contextAuditClientRequestID(request.Context()),
@@ -85,6 +86,10 @@ type apiRequestAuditReadCloser struct {
 }
 
 func newAPIRequestAuditReadCloser(body io.ReadCloser, ctx context.Context, direction string, headers http.Header) io.ReadCloser {
+	// 关闭录制时直接沿用原响应流，避免复制或缓冲上游正文。
+	if auditCaptureFromContext(ctx) == nil {
+		return body
+	}
 	return &apiRequestAuditReadCloser{ReadCloser: body, ctx: ctx, direction: direction, headers: headers}
 }
 func (r *apiRequestAuditReadCloser) Read(p []byte) (int, error) {

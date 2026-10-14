@@ -47,7 +47,7 @@ type APIRequestAuditConfig struct {
 }
 
 func DefaultAPIRequestAuditConfig() APIRequestAuditConfig {
-	return APIRequestAuditConfig{Enabled: true, MaxBodyBytes: DefaultAPIRequestAuditMaxBodyBytes, ChunkBytes: DefaultAPIRequestAuditChunkBytes, QueueCapacity: DefaultAPIRequestAuditQueueCapacity}
+	return APIRequestAuditConfig{Enabled: false, MaxBodyBytes: DefaultAPIRequestAuditMaxBodyBytes, ChunkBytes: DefaultAPIRequestAuditChunkBytes, QueueCapacity: DefaultAPIRequestAuditQueueCapacity}
 }
 
 type APIRequestAuditService struct {
@@ -284,7 +284,7 @@ func auditCaptureFromContext(ctx context.Context) *APIRequestAuditCapture {
 // bounded by the configured global audit limit and records the original byte
 // count so the UI can show truncation accurately.
 func captureAPIRequestAuditFrame(ctx context.Context, direction string, payload []byte, headers http.Header) {
-	if ctx == nil || direction == "" {
+	if auditCaptureFromContext(ctx) == nil || direction == "" {
 		return
 	}
 	originalBytes := len(payload)

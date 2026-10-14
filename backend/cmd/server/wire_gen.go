@@ -295,7 +295,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	idempotencyCoordinator := service.ProvideIdempotencyCoordinator(idempotencyRepository, configConfig)
 	claudeResetCreditService := service.ProvideClaudeResetCreditService(accountRepository, claudeTokenProvider, proxyRepository, settingService, idempotencyCoordinator, leaderLockCache)
 	apiRequestAuditRepository := repository.NewAPIRequestAuditRepository(db)
-	apiRequestAuditService := service.ProvideAPIRequestAuditService(apiRequestAuditRepository)
+	apiRequestAuditService := service.ProvideAPIRequestAuditService(apiRequestAuditRepository, configConfig)
 	contentAuditHandler := handler.ProvideContentAuditHandler(opsService, promptService, apiRequestAuditService)
 	adminHandlers := handler.ProvideAdminHandlers(dashboardHandler, adminUserHandler, groupHandler, accountHandler, adminAnnouncementHandler, dataManagementHandler, backupHandler, oAuthHandler, openAIOAuthHandler, geminiOAuthHandler, antigravityOAuthHandler, grokOAuthHandler, cnProviderHandler, proxyHandler, adminRedeemHandler, promoHandler, settingHandler, opsHandler, systemHandler, adminSubscriptionHandler, adminUsageHandler, userAttributeHandler, errorPassthroughHandler, tlsFingerprintProfileHandler, pluginHandler, adminAPIKeyHandler, scheduledTestHandler, channelHandler, channelMonitorHandler, channelMonitorRequestTemplateHandler, contentModerationHandler, promptAdminHandler, paymentHandler, affiliateHandler, complianceHandler, auditLogHandler, upstreamBillingProbeService, ollamaCloudUsageService, openCodeGoUsageService, claudeResetCreditService, pluginManager, accountDriverMaintenanceService, openAIGatewayService, contentAuditHandler)
 	usageRecordWorkerPool := service.NewUsageRecordWorkerPool(configConfig)

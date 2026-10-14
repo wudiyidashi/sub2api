@@ -108,9 +108,15 @@ type Config struct {
 	ImageStorage            ImageStorageConfig            `mapstructure:"image_storage"`
 	Plugins                 PluginConfig                  `mapstructure:"plugins"`
 	AccountDrivers          AccountDriversConfig          `mapstructure:"account_drivers"`
+	APIRequestAudit         APIRequestAuditConfig         `mapstructure:"api_request_audit"`
 
 	// Enforce only API-key spending windows in simple mode.
 	SimpleModeKeyRateLimitEnabled bool `mapstructure:"simple_mode_key_rate_limit_enabled" yaml:"simple_mode_key_rate_limit_enabled"`
+}
+
+// APIRequestAuditConfig 独立控制请求与响应原文录制，不控制安全审核或用量日志。
+type APIRequestAuditConfig struct {
+	Enabled bool `mapstructure:"enabled"`
 }
 
 // SimpleModeConfig controls startup behavior in simple mode.
@@ -2053,6 +2059,7 @@ func setDefaults() {
 	viper.SetDefault("run_mode", RunModeStandard)
 	viper.SetDefault("simple_mode.auto_create_default_groups", true)
 	viper.SetDefault("simple_mode_key_rate_limit_enabled", false)
+	viper.SetDefault("api_request_audit.enabled", false)
 
 	// Server
 	viper.SetDefault("server.host", "0.0.0.0")

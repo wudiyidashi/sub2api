@@ -614,8 +614,12 @@ func ProvideAuditLogService(repo AuditLogRepository, settingService *SettingServ
 // ProvideAPIRequestAuditService starts the bounded raw-payload audit writer.
 // The server bootstrap installs the returned service into the global HTTP
 // middleware and stops it with the other background services.
-func ProvideAPIRequestAuditService(repo APIRequestAuditRepository) *APIRequestAuditService {
-	svc := NewAPIRequestAuditService(repo, DefaultAPIRequestAuditConfig())
+func ProvideAPIRequestAuditService(repo APIRequestAuditRepository, cfg *config.Config) *APIRequestAuditService {
+	auditCfg := DefaultAPIRequestAuditConfig()
+	if cfg != nil {
+		auditCfg.Enabled = cfg.APIRequestAudit.Enabled
+	}
+	svc := NewAPIRequestAuditService(repo, auditCfg)
 	svc.Start()
 	return svc
 }

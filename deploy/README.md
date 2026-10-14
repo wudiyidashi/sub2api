@@ -262,6 +262,7 @@ docker compose down -v
 | `ADMIN_EMAIL` | No | *(auto-generated)* | Admin email (login username) |
 | `ADMIN_PASSWORD` | No | *(auto-generated)* | Admin password (8-72 bytes) |
 | `TZ` | No | `Asia/Shanghai` | Timezone |
+| `API_REQUEST_AUDIT_ENABLED` | No | `false` | Record full HTTP/WebSocket requests and responses. Independent of security moderation and usage/error logs. Restart to apply; existing records remain queryable. |
 | `UPDATE_GITHUB_REPO` | No | `wudiyidashi/sub2api` | GitHub repository used by panel hot updates and release checks. |
 | `UPDATE_GITHUB_TOKEN` | No | *(empty)* | Token for `api.github.com` release checks only; asset downloads remain anonymous. |
 | `GEMINI_OAUTH_CLIENT_ID` | No | *(builtin)* | Google OAuth client ID (Gemini OAuth). Leave empty to use the built-in Gemini CLI client. |
