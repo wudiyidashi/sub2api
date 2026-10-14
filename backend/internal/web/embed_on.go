@@ -94,7 +94,9 @@ func (s *FrontendServer) Middleware() gin.HandlerFunc {
 			return
 		}
 
-		cleanPath := strings.TrimPrefix(path, "/")
+		// embed.FS requires paths without leading or trailing slashes, while
+		// http.FileServer redirects index.html requests to a directory URL.
+		cleanPath := strings.Trim(path, "/")
 		if cleanPath == "" {
 			cleanPath = "index.html"
 		}
@@ -316,7 +318,7 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 			return
 		}
 
-		cleanPath := strings.TrimPrefix(path, "/")
+		cleanPath := strings.Trim(path, "/")
 		if cleanPath == "" {
 			cleanPath = "index.html"
 		}

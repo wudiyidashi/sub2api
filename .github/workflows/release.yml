@@ -153,6 +153,10 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -r "$RUNNER_TEMP/release-tools/requirements-release.txt"
+      - name: Test the embedded frontend from the release artifact
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        working-directory: backend
+        run: go test -tags embed ./internal/web
       - name: Select one GoReleaser target
         env:
           TARGET_OS: ${{ matrix.goos }}
