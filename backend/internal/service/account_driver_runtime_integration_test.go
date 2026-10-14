@@ -33,6 +33,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	"github.com/gin-gonic/gin"
+	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/require"
 )
 
@@ -272,6 +273,21 @@ func TestManagedCodexDriverForwardRunsNativeUsageParsing(t *testing.T) {
 	svc, account, native, connects := accountDriverForwardFixture(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
 		raw, _ := io.ReadAll(r.Body)
+		if r.Header.Get("Content-Encoding") != "zstd" {
+			t.Error("managed Codex request must use zstd encoding")
+			return
+		}
+		decoder, err := zstd.NewReader(nil)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer decoder.Close()
+		raw, err = decoder.DecodeAll(raw, nil)
+		if err != nil {
+			t.Error(err)
+			return
+		}
 		if r.URL.Path != "/backend-api/codex/responses" || r.Header.Get("Authorization") != "Bearer fake-access-token" || !bytes.Contains(raw, []byte("vendor_unknown")) {
 			t.Error("native prepared request identity or body lost")
 		}

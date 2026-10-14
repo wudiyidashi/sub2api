@@ -1,13 +1,13 @@
 {
   "repository": "https://github.com/zyycn/codex-proxy-rs.git",
-  "commit": "d875a62652e278eb5beef54356e594d1d1149e37",
-  "tag": "v3.22.1",
+  "commit": "5358de53ddd4bda529cb63c422fd5c6af070f9c9",
+  "tag": "v3.26.1",
   "rust_toolchain": "1.97.0",
   "driver_api_version": 1,
   "patches": [
     "patches/0001-host-owned-transports.patch"
   ],
-  "patch_sha256": "dc5133a811f1b6cf0389dc7f1cff1e2c2c4282ea66e54279ba1ee6e8e776234f",
+  "patch_sha256": "86664cb0ebb29e3d7326b397b0c615430fe8bbd91c50a7aed1b515fa29ea71d4",
   "runtime_entry": "CodexBackendClient::execute_prepared_http",
   "lifecycle_owner": "Sub2API native",
   "supported_transport": "Responses HTTP/SSE/WebSocket",

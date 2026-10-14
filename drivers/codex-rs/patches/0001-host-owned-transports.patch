@@ -1,5 +1,5 @@
 diff --git a/backend/crates/providers/openai/src/transport/client.rs b/backend/crates/providers/openai/src/transport/client.rs
-index adc6c14..44caae0 100644
+index 3aea968e..f86ee08a 100644
 --- a/backend/crates/providers/openai/src/transport/client.rs
 +++ b/backend/crates/providers/openai/src/transport/client.rs
 @@ -60,7 +60,7 @@ pub fn build_account_http_client(
@@ -20,7 +20,7 @@ index adc6c14..44caae0 100644
          .redirect(reqwest::redirect::Policy::none())
          .connect_timeout(timeout)
          .connector_layer(super::connection::ConnectionLayer);
-@@ -695,6 +697,18 @@ pub struct CodexBackendClient {
+@@ -703,6 +705,18 @@ pub struct CodexBackendClient {
  }
  
  impl CodexBackendClient {
@@ -40,10 +40,10 @@ index adc6c14..44caae0 100644
      pub(crate) fn with_timezone(
          mut self,
 diff --git a/backend/crates/providers/openai/src/transport/websocket/handshake.rs b/backend/crates/providers/openai/src/transport/websocket/handshake.rs
-index dffc5e6..f96ba23 100644
+index bb8bc55a..25c96987 100644
 --- a/backend/crates/providers/openai/src/transport/websocket/handshake.rs
 +++ b/backend/crates/providers/openai/src/transport/websocket/handshake.rs
-@@ -167,14 +167,6 @@ async fn connect_websocket(
+@@ -168,14 +168,6 @@ async fn connect_websocket(
      connection: &CodexWebSocketConnection,
      fast_path: bool,
  ) -> Result<(RawWsStream, WsResponse<Option<Vec<u8>>>), CodexWebSocketExchangeError> {
@@ -58,7 +58,7 @@ index dffc5e6..f96ba23 100644
      let remaining = connection
          .connection_budget
          .as_ref()
-@@ -189,45 +181,10 @@ async fn connect_websocket(
+@@ -190,45 +182,10 @@ async fn connect_websocket(
      let connect_timeout = remaining.map_or(WEBSOCKET_CONNECT_TIMEOUT, |remaining| {
          remaining.min(WEBSOCKET_CONNECT_TIMEOUT)
      });
@@ -108,7 +108,7 @@ index dffc5e6..f96ba23 100644
      .await
      .map_err(|_| CodexWebSocketExchangeError::ConnectTimeout {
          timeout: connect_timeout,
-@@ -239,10 +196,74 @@ async fn connect_websocket(
+@@ -240,10 +197,74 @@ async fn connect_websocket(
      }
  }
  
@@ -184,7 +184,7 @@ index dffc5e6..f96ba23 100644
      use tungstenite::proxy::ProxyConfig;
      let invalid =
          || tungstenite::Error::Io(std::io::Error::other("account WebSocket egress failed"));
-@@ -282,15 +303,11 @@ async fn dial_account(
+@@ -283,15 +304,11 @@ async fn dial_account(
      } else {
          MaybeTlsStream::Plain(tcp)
      };
@@ -205,7 +205,7 @@ index dffc5e6..f96ba23 100644
          dns_host
      } else {
          host.to_owned()
-@@ -340,14 +357,14 @@ fn websocket_handshake_request(
+@@ -341,14 +358,14 @@ fn websocket_handshake_request(
      builder.body(())
  }
  
@@ -223,19 +223,19 @@ index dffc5e6..f96ba23 100644
      config.extensions = extensions;
      config
 diff --git a/backend/crates/providers/openai/src/transport/websocket/mod.rs b/backend/crates/providers/openai/src/transport/websocket/mod.rs
-index 9455f4d..6981358 100644
+index fe4071be..7c87dce7 100644
 --- a/backend/crates/providers/openai/src/transport/websocket/mod.rs
 +++ b/backend/crates/providers/openai/src/transport/websocket/mod.rs
-@@ -25,7 +25,7 @@ pub use self::{
+@@ -26,7 +26,7 @@ pub use self::{
          CodexWebSocketRateLimitUpdates, CodexWebSocketResponseMetadataUpdates,
-         CodexWebSocketSseStream, CodexWebSocketStreamingExchange,
+         CodexWebSocketStreamingExchange, CodexWebSocketTextStream,
      },
 -    handshake::responses_websocket_endpoint,
 +    handshake::{connect_prepared_websocket, responses_websocket_endpoint},
      model::{
          CodexWebSocketConnection, CodexWebSocketRequest, PreviousResponseUnavailableReason,
          WebSocketContinuationRequirement,
-@@ -34,7 +34,7 @@ pub use self::{
+@@ -35,7 +35,7 @@ pub use self::{
          CodexWebSocketPool, CodexWebSocketPoolConfig, CodexWebSocketPoolKey,
          WebSocketPoolBypassReason, WebSocketPoolDecision,
      },
@@ -245,7 +245,7 @@ index 9455f4d..6981358 100644
  pub(crate) use self::{
      coordinator::{
 diff --git a/backend/crates/providers/openai/src/transport/websocket/model.rs b/backend/crates/providers/openai/src/transport/websocket/model.rs
-index 00299a0..4da9f5e 100644
+index 00299a01..4da9f5e4 100644
 --- a/backend/crates/providers/openai/src/transport/websocket/model.rs
 +++ b/backend/crates/providers/openai/src/transport/websocket/model.rs
 @@ -139,4 +139,13 @@ impl CodexWebSocketConnection {
@@ -263,11 +263,11 @@ index 00299a0..4da9f5e 100644
 +    }
  }
 diff --git a/backend/crates/providers/openai/src/transport/websocket/pump.rs b/backend/crates/providers/openai/src/transport/websocket/pump.rs
-index 8b3b031..0c3a355 100644
+index eaff47e5..ebc2d0ac 100644
 --- a/backend/crates/providers/openai/src/transport/websocket/pump.rs
 +++ b/backend/crates/providers/openai/src/transport/websocket/pump.rs
-@@ -31,7 +31,7 @@ use uuid::Uuid;
- use super::CodexWebSocketCloseError;
+@@ -36,7 +36,7 @@ use super::{
+ };
  
  /// 底层 tungstenite WebSocket 流
 -pub(crate) trait WebSocketIo:
@@ -275,7 +275,7 @@ index 8b3b031..0c3a355 100644
      Stream<Item = Result<Message, tungstenite::Error>>
      + Sink<Message, Error = tungstenite::Error>
      + Send
-@@ -47,7 +47,7 @@ impl<T> WebSocketIo for T where
+@@ -52,7 +52,7 @@ impl<T> WebSocketIo for T where
  {
  }
  

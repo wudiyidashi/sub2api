@@ -1,5 +1,21 @@
 # 账号执行驱动验证记录
 
+## 2026-10-14 上游融合验证
+
+Sub2API 合并 `Wei-Shaw/sub2api` 的 `4d9ac3e48`（79 个新提交）；增强驱动固定 CPR v3.26.1 / `5358de53ddd4bda529cb63c422fd5c6af070f9c9`（56 个新提交）。宿主准入、账号生命周期、原生计费和内容审计继续沿用，CPR 的独立管理端、调度和隐私策略不作为本驱动的继承能力。
+
+维护补丁已在干净 checkout 完整应用，并通过 prepare 重复校验。Cargo.lock 跟进上游 h2 0.4.20 和 provider-openai 的 regex 依赖；`cargo +1.97.0 fmt -- --check`、严格 clippy、locked release 构建通过。
+
+Windows x64 release 二进制 SHA256 为 `105b9cf6db4bbe895f3d9cd7bb98208ab928ed731f4dd3c2e9102c340c05e4cb`。指定该二进制运行的 18 项协议合同和 15 项生产 runner 测试全部通过，耗时分别 2.458、2.592 秒；实际宿主 service 的 AccountDriver / Managed 回归通过（5.551 秒），覆盖 zstd 正文解码后的未知字段保留及原生 usage 解析。
+
+前端 lint、类型检查与生产构建通过；全量 Vitest 的其余 373 个文件通过，旧侧栏断言修正后对应 3 项测试通过。Go vet 与新增 Gemini 缓存、Vertex、Haiku、分组翻译、临时不可调度及 Responses 兼容的定向 service 回归通过。
+
+完整 Go unit 并行运行中有一个进程全局内存断言偶发失败，独立重复 5 次通过；其余包通过，service 全量串行复核通过（190.218 秒）。
+
+本机 Docker Desktop 引擎启动失败，PostgreSQL / Redis 容器集成及 Linux release 镜像尚未复验。全量 integration 命令中的数据库测试被跳过，另有一个异步内容审核测试在并行执行中超时，其独立重复 5 次通过；不把该命令计为全量集成通过。真实上游、界面人工验收和在线管理 API 未执行。以下 2026-10-09 记录为旧版本历史证据。
+
+## 2026-10-09 验证基线
+
 验证日期：2026-10-09。CPR 固定 v3.22.1 / `d875a62652e278eb5beef54356e594d1d1149e37`；wrapper 0.2.0、driver API 1、历史 ID `codex-rs-http`。preset 使用 Sub2API 原生生命周期，Rust 提供 HTTP/SSE 与原生 WebSocket。
 
 ## 最终运行证据

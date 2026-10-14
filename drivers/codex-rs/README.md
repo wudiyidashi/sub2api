@@ -1,6 +1,6 @@
 # CPR HTTP/SSE/WebSocket 账号执行驱动
 
-`codex-rs-http` 是 Sub2API 管理的 Rust 执行进程，0.2.0 支持 HTTP/SSE 和原生 WebSocket；历史 driver ID 保持不变。账号授权、凭据刷新、额度、调度和计费仍使用 Sub2API 原生生命周期。宿主交付已选账号的 prepared 请求，驱动不启动 CPR 完整网关、账号池、控制台、数据库或 workers。
+`codex-rs-http` 是 Sub2API 管理的 Rust 执行进程，支持 HTTP/SSE 和原生 WebSocket；历史 driver ID 保持不变。CPR 来源固定为 v3.26.1 / `5358de53ddd4bda529cb63c422fd5c6af070f9c9`，由 `upstream-lock.json` 与维护补丁校验。账号授权、凭据刷新、额度、调度和计费仍使用 Sub2API 原生生命周期。宿主交付已选账号的 prepared 请求，驱动不启动 CPR 完整网关、账号池、控制台、数据库或 workers。
 
 HTTP 支持 `POST /codex/responses` 和 `POST /backend-api/codex/responses`，WebSocket 支持相同路径的 opening 和原始消息收发。真实 HTTPS/WSS 目标限定为 `chatgpt.com`，本机 HTTP/WS loopback 用于集成验证。其他目标在许可前明确拒绝；OAuth 生命周期归原生服务。
 

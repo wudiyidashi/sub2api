@@ -29,11 +29,13 @@ Please read the following carefully before using this project:
 
 ## 最新更新
 
-### 2026-10-12
+### 2026-10-14
 
-- Enhanced Codex HTTP/SSE failures now show network diagnostic categories in administrator error details, making connection, proxy, and TLS failures easier to investigate.
-- Fixed the enhanced driver failing to start in GitHub release images on systems with older libraries.
-- Codex Responses requests now use the official zstd request encoding before the managed upstream transport.
+- Added Gemini explicit context caching, Agent Platform (Vertex) API key authentication and model discovery, and image support in tool results.
+- Added Claude Haiku 5.5 support and multilingual group names and descriptions.
+- Fixed GPT-6.1 Sol subscription long-context billing and raised the generated Codex context default to 500k.
+- Improved account error isolation, Responses compatibility, payment countdowns, channel monitoring, and administrator request details.
+- Updated the enhanced Codex driver to Codex Proxy RS v3.26.1 while preserving managed HTTP/SSE and WebSocket requests, account lifecycle, and content auditing.
 
 完整更新记录见 [docs/releases/release-notes.md](docs/releases/release-notes.md)。
 
