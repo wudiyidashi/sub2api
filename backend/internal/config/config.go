@@ -116,8 +116,13 @@ type Config struct {
 
 // APIRequestAuditConfig 独立控制请求与响应原文录制，不控制安全审核或用量日志。
 type APIRequestAuditConfig struct {
-	Enabled bool `mapstructure:"enabled"`
+	Enabled        bool  `mapstructure:"enabled"`
+	RetentionHours int   `mapstructure:"retention_hours"`
+	MaxStorageMB   int64 `mapstructure:"max_storage_mb"`
 }
+
+const DefaultAPIRequestAuditRetentionHours = 24
+const DefaultAPIRequestAuditMaxStorageMB int64 = 512
 
 // SimpleModeConfig controls startup behavior in simple mode.
 type SimpleModeConfig struct {
@@ -2060,6 +2065,8 @@ func setDefaults() {
 	viper.SetDefault("simple_mode.auto_create_default_groups", true)
 	viper.SetDefault("simple_mode_key_rate_limit_enabled", false)
 	viper.SetDefault("api_request_audit.enabled", false)
+	viper.SetDefault("api_request_audit.retention_hours", DefaultAPIRequestAuditRetentionHours)
+	viper.SetDefault("api_request_audit.max_storage_mb", DefaultAPIRequestAuditMaxStorageMB)
 
 	// Server
 	viper.SetDefault("server.host", "0.0.0.0")
@@ -2735,6 +2742,12 @@ func setEnvReachableDefaults() {
 }
 
 func (c *Config) Validate() error {
+	if c.APIRequestAudit.RetentionHours < 0 || c.APIRequestAudit.RetentionHours > 8760 {
+		return fmt.Errorf("api_request_audit.retention_hours must be between 0 and 8760 (0 uses the default)")
+	}
+	if c.APIRequestAudit.MaxStorageMB < 0 || c.APIRequestAudit.MaxStorageMB > (1<<63-1)/(1024*1024) {
+		return fmt.Errorf("api_request_audit.max_storage_mb is out of range (0 uses the default)")
+	}
 	if c.AccountDrivers.CodexRSHTTP.Enabled {
 		driver := c.AccountDrivers.CodexRSHTTP
 		if strings.TrimSpace(driver.ExecutablePath) == "" {

@@ -262,13 +262,17 @@ docker compose down -v
 | `ADMIN_EMAIL` | No | *(auto-generated)* | Admin email (login username) |
 | `ADMIN_PASSWORD` | No | *(auto-generated)* | Admin password (8-72 bytes) |
 | `TZ` | No | `Asia/Shanghai` | Timezone |
-| `API_REQUEST_AUDIT_ENABLED` | No | `false` | Record full HTTP/WebSocket requests and responses. Independent of security moderation and usage/error logs. Restart to apply; existing records remain queryable. |
+| `API_REQUEST_AUDIT_RETENTION_HOURS` | No | `24` | Full content retention; expiry is checked on writes and every five minutes, including when recording is disabled. |
+| `API_REQUEST_AUDIT_MAX_STORAGE_MB` | No | `512` | Logical body and metadata budget in MiB. Whole oldest requests are evicted before writes; oversized batches are skipped. |
+| `API_REQUEST_AUDIT_ENABLED` | No | `false` | Record full HTTP/WebSocket requests and responses. Independent of security moderation and usage/error logs. Restart to apply; retained records remain queryable within the storage policy. |
 | `UPDATE_GITHUB_REPO` | No | `wudiyidashi/sub2api` | GitHub repository used by panel hot updates and release checks. |
 | `UPDATE_GITHUB_TOKEN` | No | *(empty)* | Token for `api.github.com` release checks only; asset downloads remain anonymous. |
 | `GEMINI_OAUTH_CLIENT_ID` | No | *(builtin)* | Google OAuth client ID (Gemini OAuth). Leave empty to use the built-in Gemini CLI client. |
 | `GEMINI_OAUTH_CLIENT_SECRET` | No | *(builtin)* | Google OAuth client secret (Gemini OAuth). Leave empty to use the built-in Gemini CLI client. |
 | `GEMINI_OAUTH_SCOPES` | No | *(default)* | OAuth scopes (Gemini OAuth) |
 | `GEMINI_QUOTA_POLICY` | No | *(empty)* | JSON overrides for Gemini local quota simulation (Code Assist only). |
+
+Full content cleanup runs on startup and every five minutes, even when new recording is disabled. Old records are removed by age or capacity; recent records remain queryable until evicted. PostgreSQL can reuse pages freed by deletion; this budget is not a filesystem quota and does not shrink existing database files. Reclaiming accumulated disk space requires a separate operator-approved database maintenance operation.
 
 See `.env.example` for all available options.
 

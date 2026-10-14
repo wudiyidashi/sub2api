@@ -29,6 +29,23 @@ func TestLoadAPIRequestAuditEnabled(t *testing.T) {
 			cfg, err := Load()
 			require.NoError(t, err)
 			require.Equal(t, test.want, cfg.APIRequestAudit.Enabled)
+			require.Equal(t, 24, cfg.APIRequestAudit.RetentionHours)
+			require.EqualValues(t, 512, cfg.APIRequestAudit.MaxStorageMB)
 		})
 	}
+}
+
+func TestLoadAPIRequestAuditStoragePolicy(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("API_REQUEST_AUDIT_RETENTION_HOURS", "12")
+	t.Setenv("API_REQUEST_AUDIT_MAX_STORAGE_MB", "64")
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, 12, cfg.APIRequestAudit.RetentionHours)
+	require.EqualValues(t, 64, cfg.APIRequestAudit.MaxStorageMB)
+	cfg.APIRequestAudit.RetentionHours = -1
+	require.ErrorContains(t, cfg.Validate(), "api_request_audit.retention_hours")
+	cfg.APIRequestAudit.RetentionHours = 24
+	cfg.APIRequestAudit.MaxStorageMB = -1
+	require.ErrorContains(t, cfg.Validate(), "api_request_audit.max_storage_mb")
 }

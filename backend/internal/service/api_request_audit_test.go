@@ -16,6 +16,31 @@ type recordingAuditRepo struct {
 	writes chan []*APIRequestAuditPayload
 }
 
+type cleaningAuditRepo struct {
+	recordingAuditRepo
+	cleaned chan struct{}
+}
+
+func (r *cleaningAuditRepo) CleanupAPIRequestAuditPayloads(context.Context) error {
+	r.cleaned <- struct{}{}
+	return nil
+}
+
+func TestAPIRequestAuditCleanupContinuesWhenRecordingDisabled(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		repo := &cleaningAuditRepo{recordingAuditRepo: recordingAuditRepo{writes: make(chan []*APIRequestAuditPayload, 1)}, cleaned: make(chan struct{}, 1)}
+		svc := ProvideAPIRequestAuditService(repo, &config.Config{APIRequestAudit: config.APIRequestAuditConfig{Enabled: enabled}})
+		t.Cleanup(svc.Stop)
+		select {
+		case <-repo.cleaned:
+		case <-time.After(5 * time.Second):
+			t.Fatal("retention cleanup must run even when new recording is disabled")
+		}
+		svc.Stop()
+		require.Empty(t, repo.cleaned)
+	}
+}
+
 func (r *recordingAuditRepo) InsertAPIRequestAuditPayloads(_ context.Context, payloads []*APIRequestAuditPayload) error {
 	r.writes <- payloads
 	return nil

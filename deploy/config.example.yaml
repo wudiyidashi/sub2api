@@ -8,9 +8,11 @@
 
 # Full HTTP / WebSocket request and response recording (restart to apply).
 # 请求与响应原文录制；独立于安全审核和用量日志，修改后重启生效。
-# 关闭只停止新增录制，已有记录仍可查询；临时排障时可显式启用。
+# 关闭只停止新增录制，已有原文仍按保留期和容量淘汰；临时排障时可显式启用。
 api_request_audit:
   enabled: false
+  retention_hours: 24
+  max_storage_mb: 512
 
 # =============================================================================
 # Server Configuration

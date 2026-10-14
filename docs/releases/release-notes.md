@@ -22,7 +22,8 @@
 
 ### 2026-10-14
 
-- Full HTTP and WebSocket content recording is now disabled by default and can be enabled independently for troubleshooting; security moderation, usage/error logs, and existing audit records remain available.
+- Troubleshooting content recording now retains at most one day by default and enforces a configurable 512 MiB logical budget, evicting whole oldest requests when needed.
+- Full HTTP and WebSocket content recording is now disabled by default and can be enabled independently for troubleshooting; security moderation and usage/error logs remain available, and retained audit records stay queryable within the storage policy.
 - Added Gemini explicit context caching, Agent Platform (Vertex) API key authentication and model discovery, and image support in tool results.
 - Added Claude Haiku 5.5 support and multilingual group names and descriptions.
 - Fixed GPT-6.1 Sol subscription long-context billing and raised the generated Codex context default to 500k.

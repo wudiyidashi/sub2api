@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 )
 
 const (
@@ -88,13 +90,23 @@ func (s *APIRequestAuditService) MaxBodyBytes() int {
 }
 
 func (s *APIRequestAuditService) Start() {
-	if s == nil || s.repo == nil || !s.cfg.Enabled {
+	if s == nil || s.repo == nil {
+		return
+	}
+	_, canCleanup := s.repo.(interface {
+		CleanupAPIRequestAuditPayloads(context.Context) error
+	})
+	// 关闭录制只停止新增，已有排障原文仍应遵守保留期。
+	if !s.cfg.Enabled && !canCleanup {
 		return
 	}
 	s.startOnce.Do(func() {
 		s.wg.Add(1)
 		go func() {
 			defer s.wg.Done()
+			ticker := time.NewTicker(5 * time.Minute)
+			defer ticker.Stop()
+			s.cleanup()
 			for {
 				select {
 				case <-s.ctx.Done():
@@ -104,7 +116,9 @@ func (s *APIRequestAuditService) Start() {
 					if len(batch) == 0 {
 						continue
 					}
-					_ = s.repo.InsertAPIRequestAuditPayloads(context.Background(), batch)
+					s.write(s.ctx, batch)
+				case <-ticker.C:
+					s.cleanup()
 				}
 			}
 		}()
@@ -118,12 +132,39 @@ func (s *APIRequestAuditService) Stop() {
 	s.stopOnce.Do(func() { s.cancel(); s.wg.Wait() })
 }
 
+func (s *APIRequestAuditService) cleanup() {
+	cleaner, ok := s.repo.(interface {
+		CleanupAPIRequestAuditPayloads(context.Context) error
+	})
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
+	defer cancel()
+	if err := cleaner.CleanupAPIRequestAuditPayloads(ctx); err != nil && s.ctx.Err() == nil {
+		logger.LegacyPrintf("service.content_audit", "raw content cleanup failed: %v", err)
+	}
+}
+
+func (s *APIRequestAuditService) write(parent context.Context, batch []*APIRequestAuditPayload) {
+	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
+	defer cancel()
+	if err := s.repo.InsertAPIRequestAuditPayloads(ctx, batch); err != nil && parent.Err() == nil {
+		logger.LegacyPrintf("service.content_audit", "raw content recording skipped: %v", err)
+	}
+}
+
 func (s *APIRequestAuditService) drain() {
+	// 关闭时给整个录制队列一个共享期限，避免逐批超时拖延网关停机。
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case batch := <-s.queue:
 			if len(batch) > 0 {
-				_ = s.repo.InsertAPIRequestAuditPayloads(context.Background(), batch)
+				s.write(ctx, batch)
 			}
 		default:
 			return
@@ -149,7 +190,9 @@ func (s *APIRequestAuditService) Record(ctx context.Context, payloads []*APIRequ
 	}
 	writeCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	_ = s.repo.InsertAPIRequestAuditPayloads(writeCtx, batch)
+	if err := s.repo.InsertAPIRequestAuditPayloads(writeCtx, batch); err != nil {
+		logger.LegacyPrintf("service.content_audit", "raw content recording skipped: %v", err)
+	}
 }
 
 func (s *APIRequestAuditService) normalize(payloads []*APIRequestAuditPayload) []*APIRequestAuditPayload {
