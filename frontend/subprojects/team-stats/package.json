@@ -1,0 +1,10 @@
+{
+  "name": "sub2api-team-stats",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm --dir ../.. run build:team-stats",
+    "typecheck": "pnpm --dir ../.. run typecheck:team-stats",
+    "test": "pnpm --dir ../.. run test:team-stats"
+  }
+}

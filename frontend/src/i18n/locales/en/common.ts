@@ -164,6 +164,7 @@ export default {
   // Navigation
   nav: {
     dashboard: 'Dashboard',
+    teamStats: 'Team Consumption',
     announcements: 'Announcements',
     apiKeys: 'API Keys',
     batchImage: 'Batch Images',

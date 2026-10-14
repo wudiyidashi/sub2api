@@ -164,6 +164,7 @@ export default {
   // Navigation
   nav: {
     dashboard: '仪表盘',
+    teamStats: '团队消耗看板',
     announcements: '公告',
     apiKeys: 'API 密钥',
     batchImage: '批量生图',

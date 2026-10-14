@@ -129,6 +129,20 @@ func SecurityHeaders(cfg config.CSPConfig, getFrameSrcOrigins func() []string) g
 
 		c.Header("X-Content-Type-Options", "nosniff")
 		c.Header("X-Frame-Options", "DENY")
+		// Only the built-in dashboard document can be embedded by the same-origin admin UI.
+		if c.Request.URL.Path == "/team-stats/" || c.Request.URL.Path == "/team-stats/index.html" {
+			c.Header("X-Frame-Options", "SAMEORIGIN")
+			parts := strings.Split(finalPolicy, ";")
+			filtered := make([]string, 0, len(parts)+1)
+			for _, part := range parts {
+				fields := strings.Fields(part)
+				if len(fields) > 0 && fields[0] != "frame-ancestors" {
+					filtered = append(filtered, strings.TrimSpace(part))
+				}
+			}
+			filtered = append(filtered, "frame-ancestors 'self'")
+			finalPolicy = strings.Join(filtered, "; ")
+		}
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 		if isAPIRoutePath(c) {
 			c.Next()

@@ -56,7 +56,7 @@ apiClient.interceptors.request.use(
       if (!config.params) {
         config.params = {}
       }
-      config.params.timezone = getUserTimezone()
+      config.params.timezone ??= getUserTimezone()
     }
 
     if (config.headers) {

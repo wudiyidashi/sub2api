@@ -1,0 +1,266 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root[data-theme='dark'] {
+  --bg: #121212;
+  --surface: #202124;
+  --surface-hover: #2d2e30;
+  --border: #3c4043;
+  --text: #e8eaed;
+  --muted: #9aa0a6;
+  --accent: #8ab4f8;
+  --accent-focus: #aecbfa;
+  --accent-dim: rgba(138, 180, 248, 0.15);
+  --shadow: 0 1px 3px 0 rgba(0,0,0,0.5), 0 4px 8px 3px rgba(0,0,0,0.3);
+
+  /* Google Dark brand colors */
+  --google-blue: #8ab4f8;
+  --google-red: #ea4335;
+  --google-yellow: #fbbc05;
+  --google-green: #34a853;
+
+  --success: #81c784;
+  --warning: #ffd54f;
+  --error: #e57373;
+
+  --ink: #e8eaed;
+  --parchment: #2d2e30;
+  --hairline: #3c4043;
+}
+
+:root[data-theme='light'] {
+  --bg: #f8f9fa; /* Google off-white canvas */
+  --surface: #ffffff; /* White card surface */
+  --surface-hover: #f1f3f4;
+  --border: #dadce0;
+  --text: #202124; /* Google dark grey primary text */
+  --muted: #5f6368; /* Google medium grey secondary text */
+  --accent: #1a73e8; /* Google Blue */
+  --accent-focus: #1557b0;
+  --accent-dim: rgba(26, 115, 232, 0.08);
+  --shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+
+  /* Google Light brand colors */
+  --google-blue: #1a73e8;
+  --google-red: #ea4335;
+  --google-yellow: #fbbc05;
+  --google-green: #34a853;
+
+  --success: #34a853;
+  --warning: #fbbc05;
+  --error: #ea4335;
+
+  --ink: #202124;
+  --parchment: #f8f9fa;
+  --hairline: #dadce0;
+}
+
+html, body, #app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 16px; /* Google uses 16px base font size */
+  line-height: 1.5;
+  letter-spacing: 0.1px;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Product Sans', 'Google Sans', 'Roboto', sans-serif;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* Material Design Card styling */
+.apple-card {
+  background: var(--surface);
+  border-radius: 16px; /* M3 card corners */
+  padding: 24px;
+  box-shadow: var(--shadow);
+  transition: box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s ease;
+  border: 1px solid var(--border);
+}
+
+.apple-card-interactive:hover {
+  box-shadow: 0 4px 6px 0 rgba(60,64,67,0.3), 0 8px 12px 6px rgba(60,64,67,0.15);
+  transform: translateY(-2px);
+}
+
+.apple-card-interactive:active {
+  transform: translateY(0);
+}
+
+/* Material Button filled action styling */
+.btn-primary {
+  background: var(--accent);
+  color: #ffffff;
+  font-family: 'Google Sans', 'Roboto', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  padding: 10px 24px;
+  border-radius: 9999px; /* full-pill */
+  transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3);
+}
+.btn-primary:hover {
+  background: var(--accent-focus);
+  box-shadow: 0 1px 3px 1px rgba(60,64,67,0.15), 0 1px 2px 0 rgba(60,64,67,0.3);
+}
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+/* Material Button Outlined styling */
+.btn-secondary {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  font-family: 'Google Sans', 'Roboto', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  padding: 9px 24px;
+  border-radius: 9999px; /* full-pill */
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.btn-secondary:hover {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+.btn-secondary:active {
+  transform: scale(0.98);
+}
+
+/* Material Button Text/Outlined Danger styling */
+.btn-danger {
+  background: transparent;
+  color: var(--error);
+  border: 1px solid rgba(234, 67, 53, 0.3);
+  font-family: 'Google Sans', 'Roboto', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  padding: 9px 20px;
+  border-radius: 9999px; /* Material uses rounded-full for buttons too */
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.btn-danger:hover {
+  background: rgba(234, 67, 53, 0.08);
+  border-color: var(--error);
+}
+.btn-danger:active {
+  transform: scale(0.98);
+}
+
+/* Google Material Inputs */
+.apple-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 14px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.apple-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.apple-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 14px;
+  padding: 0 12px;
+  border-radius: 8px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.apple-select:focus {
+  border-color: var(--accent);
+}
+
+/* Material Table style */
+.apple-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.apple-table th {
+  padding: 16px;
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.apple-table td {
+  padding: 16px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+  transition: background-color 0.15s ease;
+}
+.apple-table tr:hover td {
+  background-color: var(--surface-hover);
+}
+
+/* Dot indicator */
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* Grid layout helper */
+.grid-cols-24 {
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+}
+
+/* Google-colored logo layout text letters */
+.g-blue { color: #4285f4; }
+.g-red { color: #ea4335; }
+.g-yellow { color: #fbbc05; }
+.g-green { color: #34a853; }

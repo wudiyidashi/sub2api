@@ -37,6 +37,10 @@ func RegisterAdminRoutes(
 		// 仪表盘
 		registerDashboardRoutes(admin, h)
 
+		// Team consumption dashboard uses the same admin authentication and audit policy.
+		admin.GET("/team-stats/config", h.Admin.Setting.GetTeamStatsConfig)
+		admin.PUT("/team-stats/config", h.Admin.Setting.UpdateTeamStatsConfig)
+
 		// 用户管理
 		registerUserManagementRoutes(admin, h)
 

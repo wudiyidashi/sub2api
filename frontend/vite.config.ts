@@ -1,4 +1,4 @@
-import { defineConfig, loadEnv, Plugin } from 'vite'
+import { createServer, defineConfig, loadEnv, Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import checker from 'vite-plugin-checker'
 import { resolve } from 'path'
@@ -86,6 +86,22 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       vue(),
+      {
+        name: 'team-stats-subproject',
+        apply: 'serve',
+        async configureServer(server) {
+          const statsServer = await createServer({
+            configFile: resolve(__dirname, 'subprojects/team-stats/vite.config.ts'),
+            server: { middlewareMode: true, hmr: { server: server.httpServer! } },
+            appType: 'mpa',
+          })
+          server.middlewares.use((req, res, next) => {
+            if (req.url?.startsWith('/team-stats/')) statsServer.middlewares(req, res, next)
+            else next()
+          })
+          server.httpServer?.once('close', () => { void statsServer.close() })
+        },
+      },
       checker({
         vueTsc: true
       }),

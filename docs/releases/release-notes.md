@@ -22,6 +22,7 @@
 
 ### 2026-10-14
 
+- Added an administrator-only team consumption dashboard with overview, virtual groups, rankings, activity insights, and usage details. It shares the existing login and supports importing previous dashboard group configurations.
 - Troubleshooting content recording now retains at most one day by default and enforces a configurable 512 MiB logical budget, evicting whole oldest requests when needed.
 - Full HTTP and WebSocket content recording is now disabled by default and can be enabled independently for troubleshooting; security moderation and usage/error logs remain available, and retained audit records stay queryable within the storage policy.
 - Added Gemini explicit context caching, Agent Platform (Vertex) API key authentication and model discovery, and image support in tool results.

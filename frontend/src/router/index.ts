@@ -403,6 +403,12 @@ const routes: RouteRecordRaw[] = [
     redirect: '/admin/dashboard'
   },
   {
+    path: '/admin/team-stats',
+    name: 'AdminTeamStats',
+    component: () => import('@/views/admin/TeamStatsView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, title: '团队消耗看板', titleKey: 'nav.teamStats' }
+  },
+  {
     path: '/admin/dashboard',
     name: 'AdminDashboard',
     component: () => import('@/views/admin/DashboardView.vue'),
