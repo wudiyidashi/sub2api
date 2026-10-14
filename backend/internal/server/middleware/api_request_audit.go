@@ -146,10 +146,10 @@ func (w *apiRequestAuditResponseWriter) capture(data []byte) {
 	}
 	remaining := w.maxBytes - w.body.Len()
 	if len(data) > remaining {
-		w.body.Write(data[:remaining])
+		_, _ = w.body.Write(data[:remaining])
 		w.truncated = true
 	} else {
-		w.body.Write(data)
+		_, _ = w.body.Write(data)
 	}
 }
 

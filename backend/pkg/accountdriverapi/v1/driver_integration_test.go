@@ -83,7 +83,7 @@ func newDriverHarness(t *testing.T, proxyURL string) *driverHarness {
 	go func() { _ = callbackServer.Serve(listener) }()
 	t.Cleanup(callbackServer.Stop)
 
-	cmd := exec.Command(binary)
+	cmd := exec.Command(binary) //nolint:gosec // G702: 仅执行测试操作者指定的驱动文件，不经过 shell 或接收网关请求输入。
 	cmd.Env = append(os.Environ(), "SUB2API_ACCOUNT_DRIVER_TOKEN="+token, "SUB2API_ACCOUNT_DRIVER_CALLBACK=http://"+listener.Addr().String())
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -257,7 +257,7 @@ func TestRustDriverPreparedRequestAndCompleteHeaders(t *testing.T) {
 			head = value.GetHead()
 		}
 		if value.GetBody() != nil {
-			body.Write(value.GetBody().Data)
+			_, _ = body.Write(value.GetBody().Data)
 		}
 		if value.GetEnd() != nil {
 			ended = true
@@ -301,7 +301,7 @@ func TestRustDriverPreservesHTTP401Body(t *testing.T) {
 			t.Fatal("HTTP error turned into opaque RPC failure")
 		}
 		if value.GetBody() != nil {
-			body.Write(value.GetBody().Data)
+			_, _ = body.Write(value.GetBody().Data)
 		}
 	}
 	_ = stream.CloseSend()
@@ -455,7 +455,10 @@ func TestRustDriverBackpressureDoesNotBlockCancel(t *testing.T) {
 		_, _ = io.Copy(io.Discard, r.Body)
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(200)
-		w.(http.Flusher).Flush()
+		if err := http.NewResponseController(w).Flush(); err != nil {
+			t.Error(err)
+			return
+		}
 		chunk := bytes.Repeat([]byte("x"), 64*1024)
 		for {
 			select {
@@ -468,7 +471,10 @@ func TestRustDriverBackpressureDoesNotBlockCancel(t *testing.T) {
 				close(disconnected)
 				return
 			}
-			w.(http.Flusher).Flush()
+			if err := http.NewResponseController(w).Flush(); err != nil {
+				close(disconnected)
+				return
+			}
 		}
 	}))
 	defer upstream.Close()
@@ -494,7 +500,7 @@ func TestRustDriverDoesNotRetryDisconnectedUpstream(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
 		_, _ = io.Copy(io.Discard, r.Body)
-		conn, _, err := w.(http.Hijacker).Hijack()
+		conn, _, err := http.NewResponseController(w).Hijack()
 		if err != nil {
 			t.Error(err)
 			return
@@ -549,7 +555,10 @@ func TestRustDriverHeaderTimeoutEndsAtHeadAndDoesNotInterruptBody(t *testing.T) 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.(http.Flusher).Flush()
+		if err := http.NewResponseController(w).Flush(); err != nil {
+			t.Error(err)
+			return
+		}
 		select {
 		case <-bodyReleased:
 			_, _ = io.WriteString(w, "data: [DONE]\n\n")
@@ -578,7 +587,7 @@ func TestRustDriverHeaderTimeoutEndsAtHeadAndDoesNotInterruptBody(t *testing.T) 
 			t.Fatalf("header timeout interrupted body: %+v", value.GetFailure())
 		}
 		if value.GetBody() != nil {
-			body.Write(value.GetBody().Data)
+			_, _ = body.Write(value.GetBody().Data)
 		}
 	}
 	_ = stream.CloseSend()

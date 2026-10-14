@@ -145,7 +145,7 @@ func TestRustWebSocketTwoTurnsKeepRawBytesAndConnectionLocalResponse(t *testing.
 			t.Error(err)
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		connections.Add(1)
 		for index := range want {
 			kind, raw, err := conn.ReadMessage()
@@ -237,7 +237,7 @@ func TestRustWebSocketCredentialRotationCreatesIndependentIdentity(t *testing.T)
 			t.Error(err)
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		connections.Add(1)
 		seen <- r.Header.Get("Authorization")
 		_, _, _ = conn.ReadMessage()
@@ -265,7 +265,7 @@ func TestRustWebSocketIdlePingWorksWithoutHostRead(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		conn.SetPongHandler(func(string) error {
 			select {
 			case pong <- struct{}{}:
@@ -302,7 +302,7 @@ func TestRustWebSocketBinaryPeerCloseAndNoResendAfterDrop(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		connections.Add(1)
 		kind, data, err := conn.ReadMessage()
 		if err != nil {
@@ -343,7 +343,7 @@ func TestRustWebSocketBackpressure200MiBDoesNotBlockClose(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		defer close(closed)
 		_ = conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
 		payload := bytes.Repeat([]byte("x"), 1024*1024)

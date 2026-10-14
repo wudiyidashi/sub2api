@@ -98,10 +98,10 @@ func (r *apiRequestAuditReadCloser) Read(p []byte) (int, error) {
 	if r.buf.Len() < MaxAPIRequestAuditBodyBytes {
 		remaining := MaxAPIRequestAuditBodyBytes - r.buf.Len()
 		if n > remaining {
-			r.buf.Write(p[:remaining])
+			_, _ = r.buf.Write(p[:remaining])
 			r.truncated = true
 		} else {
-			r.buf.Write(p[:n])
+			_, _ = r.buf.Write(p[:n])
 		}
 	} else if n > 0 {
 		r.truncated = true

@@ -16,7 +16,7 @@ func (r *accountRepository) BeginAccountDriverMaintenance(ctx context.Context, i
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	prior, err := maintenanceStatusByOperation(ctx, tx, input.OperationID)
 	if err != nil {
 		return nil, err
@@ -35,11 +35,11 @@ func (r *accountRepository) BeginAccountDriverMaintenance(ctx context.Context, i
 	var revision int64
 	var schedulable bool
 	if !rows.Next() {
-		rows.Close()
+		_ = rows.Close()
 		return nil, service.ErrAccountNotFound
 	}
 	err = rows.Scan(&source, &revision, &schedulable)
-	rows.Close()
+	_ = rows.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func maintenanceReadStatus(ctx context.Context, reader maintenanceSQLReader, con
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	if !rows.Next() {
 		return &service.AccountDriverMaintenanceStatus{AccountID: id, State: "idle"}, nil
 	}
@@ -138,7 +138,7 @@ func (r *accountRepository) FinishAccountDriverMaintenance(ctx context.Context, 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if _, err = tx.ExecContext(ctx, `SELECT id FROM accounts WHERE id=$1 FOR UPDATE`, id); err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func (r *accountRepository) CommitAccountDriverSwitch(ctx context.Context, op *s
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if _, err = tx.ExecContext(ctx, `SELECT id FROM accounts WHERE id=$1 FOR UPDATE`, op.AccountID); err != nil {
 		return err
 	}
@@ -212,13 +212,13 @@ func (r *accountRepository) ListExpiredAccountDriverMaintenance(ctx context.Cont
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return nil, err
 		}
 		ids = append(ids, id)
 	}
 	err = rows.Err()
-	rows.Close()
+	_ = rows.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -244,23 +244,23 @@ func (r *accountRepository) acquireAccountDriverOperation(ctx context.Context, i
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	rows, err := tx.QueryContext(ctx, `SELECT account_driver_id,account_driver_revision FROM accounts WHERE id=$1 AND deleted_at IS NULL FOR KEY SHARE`, id)
 	if err != nil {
 		return err
 	}
 	if !rows.Next() {
-		rows.Close()
+		_ = rows.Close()
 		return service.ErrAccountNotFound
 	}
 	var driverID string
 	var revision int64
 	err = rows.Scan(&driverID, &revision)
-	rows.Close()
+	_ = rows.Close()
 	if err != nil {
 		return err
 	}
-	if account != nil && (account.EffectiveAccountDriverID() != driverID || (account.AccountDriverRevision != revision && !(account.AccountDriverRevision == 0 && driverID == "native"))) {
+	if account != nil && (account.EffectiveAccountDriverID() != driverID || (account.AccountDriverRevision != revision && (account.AccountDriverRevision != 0 || driverID != "native"))) {
 		return infraerrors.Conflict("ACCOUNT_DRIVER_BINDING_CHANGED", "account binding changed; reload the account before admitting the operation")
 	}
 	result, err := tx.ExecContext(ctx, `INSERT INTO account_driver_operation_leases(lease_id,account_id,kind,expires_at)

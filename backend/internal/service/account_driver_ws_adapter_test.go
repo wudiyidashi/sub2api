@@ -82,7 +82,7 @@ func TestManagedAccountWSDialBindingCannotComeFromHeaders(t *testing.T) {
 	enableManagedWSForTest(t)
 	native := &openAIWSCountingDialer{}
 	fake := newManagedWSFakeConn()
-	defer fake.Close()
+	defer func() { _ = fake.Close() }()
 	calls := 0
 	dialer := &managedOpenAIWSClientDialer{native: native, managed: func(_ context.Context, _ string, _ http.Header, _ string, id, revision int64, scope string) (managedAccountWSConnection, int, http.Header, error) {
 		calls++
@@ -139,7 +139,7 @@ func TestManagedAccountWSPoolIsolatesAuthBindingScopeAndGeneration(t *testing.T)
 
 func TestManagedAccountWSSentFactsSurviveTimeoutAndCompletedTurn(t *testing.T) {
 	fake := newManagedWSFakeConn()
-	defer fake.Close()
+	defer func() { _ = fake.Close() }()
 	adapter := &managedOpenAIWSClientConn{conn: fake}
 	pooled := newOpenAIWSConn("managed", 1, adapter, nil)
 	defer pooled.abort()
@@ -150,7 +150,7 @@ func TestManagedAccountWSSentFactsSurviveTimeoutAndCompletedTurn(t *testing.T) {
 	_, fallback := wrapOpenAIWSFallback("read_event", err).(*openAIWSFallbackError)
 	require.False(t, fallback)
 	fake = newManagedWSFakeConn()
-	defer fake.Close()
+	defer func() { _ = fake.Close() }()
 	adapter = &managedOpenAIWSClientConn{conn: fake}
 	pooled = newOpenAIWSConn("next-managed", 1, adapter, nil)
 	defer pooled.abort()

@@ -476,7 +476,7 @@ func (b *responseBody) Close() error               { b.once.Do(b.cleanup); retur
 
 func receiveBody(stream grpc.BidiStreamingClient[api.ExecuteCommand, api.ExecuteEvent], writer *io.PipeWriter, state *atomic.Int32, cleanup func()) {
 	defer cleanup()
-	defer writer.Close()
+	defer func() { _ = writer.Close() }()
 	for {
 		event, err := stream.Recv()
 		if err != nil {

@@ -41,7 +41,7 @@ func loadAccountDriverRuntimeState(path string) (*accountDriverRuntimeState, err
 	if err != nil {
 		return nil, errors.New("published account driver state is unreadable")
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	decoder := json.NewDecoder(io.LimitReader(file, 65537))
 	decoder.DisallowUnknownFields()
 	var record accountDriverRuntimeState
@@ -76,7 +76,7 @@ func saveAccountDriverRuntimeState(path string, record accountDriverRuntimeState
 		return errors.New("account driver publication temporary file could not be created")
 	}
 	temp := file.Name()
-	defer os.Remove(temp)
+	defer func() { _ = os.Remove(temp) }()
 	if err = file.Chmod(0600); err == nil {
 		_, err = file.Write(append(data, '\n'))
 	}
@@ -106,7 +106,7 @@ func stageAccountDriverRuntimeArtifact(statePath string, artifact accountDriverR
 	if err != nil {
 		return artifact, errors.New("account driver executable is unavailable")
 	}
-	defer source.Close()
+	defer func() { _ = source.Close() }()
 	info, err := source.Stat()
 	if err != nil || !info.Mode().IsRegular() {
 		return artifact, errors.New("account driver executable is not a regular file")
@@ -120,7 +120,7 @@ func stageAccountDriverRuntimeArtifact(statePath string, artifact accountDriverR
 		return artifact, errors.New("account driver artifact could not be staged")
 	}
 	tempPath := temp.Name()
-	defer os.Remove(tempPath)
+	defer func() { _ = os.Remove(tempPath) }()
 	digest := sha256.New()
 	_, err = io.Copy(io.MultiWriter(temp, digest), source)
 	if err == nil {

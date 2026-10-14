@@ -98,8 +98,12 @@ func (f *Facade) GetRequest(ctx context.Context, requestID string) (*RequestDeta
 			return nil, infraerrors.NotFound("CONTENT_AUDIT_REQUEST_NOT_FOUND", "request detail not found")
 		}
 		payloads, payloadErr := f.raw.List(ctx, requestID)
-		if payloadErr != nil { return nil, payloadErr }
-		if len(payloads) == 0 { return nil, infraerrors.NotFound("CONTENT_AUDIT_REQUEST_NOT_FOUND", "request detail not found") }
+		if payloadErr != nil {
+			return nil, payloadErr
+		}
+		if len(payloads) == 0 {
+			return nil, infraerrors.NotFound("CONTENT_AUDIT_REQUEST_NOT_FOUND", "request detail not found")
+		}
 		return &RequestDetail{RawPayloads: payloads, ClientRequest: combineRawPayloads(payloads, service.APIRequestAuditDirectionClientRequest), ClientResponse: combineRawPayloads(payloads, service.APIRequestAuditDirectionClientResponse), UpstreamRequest: combineRawPayloads(payloads, service.APIRequestAuditDirectionUpstreamRequest), UpstreamResponse: combineRawPayloads(payloads, service.APIRequestAuditDirectionUpstreamResponse)}, nil
 	}
 	detail := &RequestDetail{Request: rows.Items[0]}

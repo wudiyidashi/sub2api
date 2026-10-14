@@ -62,7 +62,7 @@ func TestManagedRoundTripKeepsFullResponseAndPreparedRequest(t *testing.T) {
 	var observed api.SendState
 	response, err := client.RoundTripWithObserver(request, "", 17, 1, func(state api.SendState) { observed = state })
 	require.NoError(t, err)
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	require.Equal(t, api.SendState_SEND_STATE_AMBIGUOUS, observed)
 	require.Equal(t, http.StatusCreated, response.StatusCode)
 	require.Equal(t, []string{"one", "two"}, response.Header.Values("X-Upstream-Unknown"))
@@ -78,7 +78,7 @@ func TestManagedRoundTripDropAfterSendIsAmbiguous(t *testing.T) {
 	client := startFixtureRunner(t)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.Copy(io.Discard, r.Body)
-		connection, _, err := w.(http.Hijacker).Hijack()
+		connection, _, err := http.NewResponseController(w).Hijack()
 		require.NoError(t, err)
 		_ = connection.Close()
 	}))
@@ -100,7 +100,7 @@ func TestManagedCancellationClosesUnreadResponse(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		_, _ = io.WriteString(w, "data: {}\n\n")
-		w.(http.Flusher).Flush()
+		require.NoError(t, http.NewResponseController(w).Flush())
 		<-r.Context().Done()
 		close(closed)
 	}))
@@ -148,7 +148,7 @@ func TestManagedHeaderTimeoutKeepsAmbiguousAndDoesNotTimeOutBody(t *testing.T) {
 	streaming := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
-		w.(http.Flusher).Flush()
+		require.NoError(t, http.NewResponseController(w).Flush())
 		time.Sleep(350 * time.Millisecond)
 		_, _ = io.WriteString(w, "data: after-header-timeout\n\n")
 	}))
@@ -158,7 +158,7 @@ func TestManagedHeaderTimeoutKeepsAmbiguousAndDoesNotTimeOutBody(t *testing.T) {
 	request.Header.Set("Authorization", "Bearer host-fixture")
 	response, err = client.RoundTripWithObserverTimeout(request, "", 17, 1, 200*time.Millisecond, nil)
 	require.NoError(t, err)
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	body, err := io.ReadAll(response.Body)
 	require.NoError(t, err)
 	require.Equal(t, "data: after-header-timeout\n\n", string(body))

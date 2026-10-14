@@ -40,7 +40,7 @@ func wsEchoFixture(t *testing.T, observed func(*http.Request, *coderws.Conn)) (s
 			t.Error(err)
 			return
 		}
-		defer conn.CloseNow()
+		defer func() { _ = conn.CloseNow() }()
 		conn.SetReadLimit(WebSocketMessageLimit)
 		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 		defer cancel()
@@ -166,7 +166,7 @@ func TestManagedWebSocketCancelledWriteWaiterDoesNotBreakSequence(t *testing.T) 
 	url, _ := wsEchoFixture(t, nil)
 	conn, _, _, err := client.DialWebSocket(context.Background(), url, wsFixtureHeaders(), "", wsFixtureOptions())
 	require.NoError(t, err)
-	defer conn.CloseNow()
+	defer func() { _ = conn.CloseNow() }()
 	conn.sendGate <- struct{}{}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
 	defer cancel()
@@ -198,7 +198,7 @@ func TestManagedWebSocketInvalidFramesDoNotPoisonConnection(t *testing.T) {
 	url, _ := wsEchoFixture(t, nil)
 	conn, _, _, err := client.DialWebSocket(context.Background(), url, wsFixtureHeaders(), "", wsFixtureOptions())
 	require.NoError(t, err)
-	defer conn.CloseNow()
+	defer func() { _ = conn.CloseNow() }()
 	require.Error(t, conn.Write(context.Background(), coderws.MessageText, []byte{255}))
 	require.Error(t, conn.Write(context.Background(), coderws.MessageBinary, make([]byte, WebSocketMessageLimit+1)))
 	require.False(t, conn.MayHaveSentBusiness())
@@ -294,7 +294,7 @@ func TestManagedWebSocketBackpressureDoesNotBlockClose(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		defer conn.CloseNow()
+		defer func() { _ = conn.CloseNow() }()
 		ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 		defer cancel()
 		readDone := make(chan error, 1)
@@ -351,7 +351,7 @@ func TestManagedWebSocketPingTimeoutPreservesBusinessSendingWatermark(t *testing
 			t.Error(err)
 			return
 		}
-		defer conn.CloseNow()
+		defer func() { _ = conn.CloseNow() }()
 		// Deliberately do not read: coder/websocket won't process Ping or send Pong.
 		<-release
 	}))
@@ -359,7 +359,7 @@ func TestManagedWebSocketPingTimeoutPreservesBusinessSendingWatermark(t *testing
 	defer close(release)
 	conn, _, _, err := client.DialWebSocket(context.Background(), "ws"+strings.TrimPrefix(upstream.URL, "http")+"/codex/responses", wsFixtureHeaders(), "", wsFixtureOptions())
 	require.NoError(t, err)
-	defer conn.CloseNow()
+	defer func() { _ = conn.CloseNow() }()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	require.NoError(t, conn.Write(ctx, coderws.MessageText, []byte("may have been processed")))

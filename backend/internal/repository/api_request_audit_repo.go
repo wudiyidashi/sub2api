@@ -35,7 +35,7 @@ func (r *apiRequestAuditRepository) InsertAPIRequestAuditPayloads(ctx context.Co
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 	for _, payload := range payloads {
 		if payload == nil || strings.TrimSpace(payload.RequestID) == "" {
 			continue
@@ -67,7 +67,7 @@ func (r *apiRequestAuditRepository) ListAPIRequestAuditPayloads(ctx context.Cont
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make([]*service.APIRequestAuditPayload, 0)
 	for rows.Next() {
 		var payload service.APIRequestAuditPayload

@@ -356,7 +356,7 @@ func (s *UpdateService) driverExecutablePath() string {
 		if candidate == "" {
 			continue
 		}
-		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() { //nolint:gosec // G703: 路径仅来自部署操作者配置的驱动位置或本进程目录，不接受远程请求路径。
 			return candidate
 		}
 	}
