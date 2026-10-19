@@ -1,5 +1,6 @@
 import { createServer, defineConfig, loadEnv, Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import * as vueCompiler from 'vue/compiler-sfc'
 import checker from 'vite-plugin-checker'
 import { resolve } from 'path'
 
@@ -85,7 +86,8 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [
-      vue(),
+      // 子项目首次加载前也会收到文件更新，提前提供编译器供 HMR 使用。
+      vue({ compiler: vueCompiler }),
       {
         name: 'team-stats-subproject',
         apply: 'serve',

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Build natively on the matching runner, with the same libc as the runtime.
-FROM rust:1.97-slim-bookworm AS driver-build
+FROM rust:1.99.1-slim-bookworm AS driver-build
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake pkg-config libssl-dev protobuf-compiler git \
     && rm -rf /var/lib/apt/lists/*

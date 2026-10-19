@@ -83,6 +83,21 @@ jobs:
           args: --timeout=30m
           working-directory: backend
 
+  account-driver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare the pinned Codex transport source
+        run: sh drivers/codex-rs/prepare-upstream.sh
+      - name: Verify the Linux driver against the host HTTP and WebSocket contracts
+        run: |
+          docker build --progress=plain \
+            --build-context host-api=backend/pkg/accountdriverapi/v1 \
+            --build-context host-go=backend \
+            -f drivers/codex-rs/Dockerfile \
+            -t sub2api-codex-driver-verification drivers/codex-rs
+
   release-helpers:
     runs-on: ubuntu-latest
     steps:

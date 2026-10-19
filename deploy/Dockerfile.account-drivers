@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 ARG SUB2API_BUILDER_IMAGE=sub2api-account-driver-builder:latest
-ARG RUST_IMAGE=rust:1.97-slim-bookworm
+ARG RUST_IMAGE=rust:1.99.1-slim-bookworm
 ARG RUNTIME_IMAGE=postgres:18-bookworm
 
 # 原仓库 backend-builder 提供已嵌入面板的宿主与定价资源

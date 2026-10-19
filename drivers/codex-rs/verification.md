@@ -1,5 +1,13 @@
 # 账号执行驱动验证记录
 
+## 2026-10-19 上游同步验证
+
+Sub2API 同步 `Wei-Shaw/sub2api` 的 `b0a02a3304a0a78cdd003ddda1dd23ba02c03084`（48 个新提交）；驱动 0.2.3 固定 CPR v3.29.3 / `16d8a3f87309d9346a5f204673390fe20478b40e`（77 个新提交），使用 Rust 1.99.1。维护补丁重新生成并校验；宿主持有 prepared 请求、账号生命周期、重试预算与连接池的边界保持有效。
+
+Windows 的 locked release 构建、格式检查与严格 Clippy 通过。实际启动新二进制，协议测试 18 项、生产 runner 测试 15 项通过，覆盖 HTTP/SSE、WebSocket、完整响应头、原始消息、代理、5 MiB 请求、200 MiB 背压、发送状态、取消和握手拒绝。生成的 tonic 客户端与 WebSocket RPC 入口继续使用协议规定的 `tonic::Status`，仅在这些边界允许 `result_large_err`。
+
+Linux 合同验证纳入 CI 的 `account-driver` 任务，由 Bookworm 中构建出的真实驱动运行同一组协议与 runner 测试；本地未执行 Linux 容器构建。
+
 ## 2026-10-14 上游融合验证
 
 Sub2API 合并 `Wei-Shaw/sub2api` 的 `4d9ac3e48`（79 个新提交）；增强驱动固定 CPR v3.26.1 / `5358de53ddd4bda529cb63c422fd5c6af070f9c9`（56 个新提交）。宿主准入、账号生命周期、原生计费和内容审计继续沿用，CPR 的独立管理端、调度和隐私策略不作为本驱动的继承能力。

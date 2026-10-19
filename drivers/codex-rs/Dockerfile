@@ -1,8 +1,9 @@
-FROM rust:1.97-slim-bookworm AS rust-build
+FROM rust:1.99.1-slim-bookworm AS rust-build
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential cmake pkg-config libssl-dev protobuf-compiler git && rm -rf /var/lib/apt/lists/*
 WORKDIR /workspace/drivers/codex-rs
 COPY . .
 COPY --from=host-api account_driver.proto /workspace/backend/pkg/accountdriverapi/v1/account_driver.proto
+ENV CARGO_BUILD_JOBS=2
 RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/usr/local/cargo/git --mount=type=cache,target=/workspace/drivers/codex-rs/target cargo build --release --locked && cp target/release/sub2api-codex-account-driver /sub2api-codex-account-driver
 
 FROM golang:1.27.2-bookworm AS verification

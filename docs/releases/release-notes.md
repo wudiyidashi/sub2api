@@ -31,3 +31,13 @@
 - Fixed GPT-6.1 Sol subscription long-context billing and raised the generated Codex context default to 500k.
 - Improved account error isolation, Responses compatibility, payment countdowns, channel monitoring, and administrator request details.
 - Updated the enhanced Codex driver to Codex Proxy RS v3.26.1 while preserving managed HTTP/SSE and WebSocket requests, account lifecycle, and content auditing.
+
+### 2026-10-19
+
+- Added Gemini 4 Argon discovery and pricing, with thinking-level forwarding and streamed thought summaries on compatibility endpoints.
+- Added a configurable minimum output-token allowance for compatibility requests.
+- Fixed composite-group OAuth routing and adapted model availability to the GPT-5.5 retirement on ChatGPT subscription accounts.
+- Improved payment confirmation, Stripe order resumption, and pending refund accounting.
+- Improved Responses compatibility for strict clients, corrected Zhipu quota windows, and isolated Codex imports by workspace.
+- Restored inline account filters, including enhanced-driver filtering.
+- Updated the enhanced Codex transport to CPR v3.29.3 with TLS and archive dependency security fixes.

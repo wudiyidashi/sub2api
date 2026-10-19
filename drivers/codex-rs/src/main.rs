@@ -29,6 +29,8 @@ use tonic::{
     transport::{Endpoint, Server},
 };
 
+// tonic 生成客户端固定使用 Status 作为 RPC 错误，保持公开协议类型
+#[allow(clippy::result_large_err)]
 mod wire {
     tonic::include_proto!("sub2api.accountdriver.v1");
 }

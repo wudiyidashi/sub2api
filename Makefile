@@ -7,6 +7,7 @@ FRONTEND_CRITICAL_VITEST := \
 	src/api/__tests__/keys.bulkUpdate.spec.ts \
 	src/api/__tests__/admin.accountDrivers.spec.ts \
 	src/features/account-drivers/__tests__/AccountDriverSelector.spec.ts \
+	src/components/admin/account/__tests__/AccountTableFilters.spec.ts \
 	src/composables/__tests__/useModelWhitelist.spec.ts \
 	src/components/account/__tests__/OpenAIReferralCell.spec.ts \
 	src/components/account/__tests__/OpenAIReferralCell.transport.spec.ts \
@@ -24,6 +25,7 @@ FRONTEND_CRITICAL_VITEST := \
 	src/views/auth/__tests__/LinuxDoCallbackView.spec.ts \
 	src/views/auth/__tests__/WechatCallbackView.spec.ts \
 	src/views/user/__tests__/PaymentView.spec.ts \
+	src/views/user/__tests__/StripePaymentView.spec.ts \
 	src/views/user/__tests__/PaymentResultView.spec.ts \
 	src/views/user/__tests__/ChannelStatusView.mode.spec.ts \
 	src/components/user/profile/__tests__/ProfileInfoCard.spec.ts \

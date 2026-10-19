@@ -1,8 +1,8 @@
 [package]
 name = "sub2api-codex-account-driver"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2024"
-rust-version = "1.97"
+rust-version = "1.99.1"
 publish = false
 
 [dependencies]

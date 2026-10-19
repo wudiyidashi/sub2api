@@ -88,6 +88,8 @@ async fn fail(output: &Output, state: &State, code: &str, message: &str) {
     let _ = emit(&output.control, state, failure(state, code, message)).await;
 }
 
+// 与生成的 tonic 服务签名一致，避免为缩小错误枚举而改写 RPC 合同
+#[allow(clippy::result_large_err)]
 pub async fn open(
     runner: Runner,
     request: Request<Streaming<WebSocketCommand>>,

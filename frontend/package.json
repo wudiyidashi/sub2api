@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --config vite.config.ts",
     "check:i18n": "vitest run src/i18n/__tests__/localeKeyCompleteness.spec.ts",
     "build": "pnpm run check:i18n && vue-tsc -b && vite build && pnpm run build:team-stats",
     "preview": "vite preview",

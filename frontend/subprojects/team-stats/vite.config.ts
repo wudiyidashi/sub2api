@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
+import * as vueCompiler from 'vue/compiler-sfc';
 import { fileURLToPath, URL } from 'node:url';
 import tailwindcss from 'tailwindcss';
 import autoprefixer from 'autoprefixer';
@@ -10,7 +11,7 @@ const root = fileURLToPath(new URL('.', import.meta.url));
 export default defineConfig({
   root,
   base: '/team-stats/',
-  plugins: [vue()],
+  plugins: [vue({ compiler: vueCompiler })],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   css: { postcss: { plugins: [tailwindcss({
     ...tailwindConfig,

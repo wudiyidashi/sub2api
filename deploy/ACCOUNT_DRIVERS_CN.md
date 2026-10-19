@@ -8,7 +8,7 @@ Sub2API 现在可为新账号选择原生管理或 `Codex 增强`。账号、授
 
 ```powershell
 ./drivers/codex-rs/prepare-upstream.ps1
-cargo +1.97.0 build --release --manifest-path drivers/codex-rs/Cargo.toml --locked
+cargo +1.99.1 build --release --manifest-path drivers/codex-rs/Cargo.toml --locked
 $env:COREPACK_ENABLE_AUTO_PIN = '0'
 pnpm --dir frontend run build
 Push-Location backend
@@ -16,7 +16,7 @@ go build -tags embed -o ../sub2api.exe ./cmd/server
 Pop-Location
 ```
 
-Windows 需要 Rust 1.97、protoc 与 MSVC 构建工具；Rust 输出位于 `drivers/codex-rs/target/release/sub2api-codex-account-driver.exe`。Linux 构建要求见 [驱动文档](../drivers/codex-rs/README.md)。原有 PostgreSQL、Redis 与初始化流程保持原样，不需要再部署 CPR 的数据库或 Web 控制台。
+Windows 需要 Rust 1.99.1、protoc 与 MSVC 构建工具；Rust 输出位于 `drivers/codex-rs/target/release/sub2api-codex-account-driver.exe`。Linux 构建要求见 [驱动文档](../drivers/codex-rs/README.md)。原有 PostgreSQL、Redis 与初始化流程保持原样，不需要再部署 CPR 的数据库或 Web 控制台。
 
 在现有 Sub2API `config.yaml` 中加入：
 

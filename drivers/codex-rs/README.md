@@ -1,17 +1,17 @@
 # CPR HTTP/SSE/WebSocket 账号执行驱动
 
-`codex-rs-http` 是 Sub2API 管理的 Rust 执行进程，支持 HTTP/SSE 和原生 WebSocket；历史 driver ID 保持不变。CPR 来源固定为 v3.26.1 / `5358de53ddd4bda529cb63c422fd5c6af070f9c9`，由 `upstream-lock.json` 与维护补丁校验。账号授权、凭据刷新、额度、调度和计费仍使用 Sub2API 原生生命周期。宿主交付已选账号的 prepared 请求，驱动不启动 CPR 完整网关、账号池、控制台、数据库或 workers。
+`codex-rs-http` 是 Sub2API 管理的 Rust 执行进程，支持 HTTP/SSE 和原生 WebSocket；历史 driver ID 保持不变。CPR 来源固定为 v3.29.3 / `16d8a3f87309d9346a5f204673390fe20478b40e`，由 `upstream-lock.json` 与维护补丁校验。账号授权、凭据刷新、额度、调度和计费仍使用 Sub2API 原生生命周期。宿主交付已选账号的 prepared 请求，驱动不启动 CPR 完整网关、账号池、控制台、数据库或 workers。
 
 HTTP 支持 `POST /codex/responses` 和 `POST /backend-api/codex/responses`，WebSocket 支持相同路径的 opening 和原始消息收发。真实 HTTPS/WSS 目标限定为 `chatgpt.com`，本机 HTTP/WS loopback 用于集成验证。其他目标在许可前明确拒绝；OAuth 生命周期归原生服务。
 
 ## 构建
 
-需要 Git、Rust 1.97.0、protoc 和平台 C/C++ 构建工具。Windows 需要 MSVC，Linux 需要 OpenSSL、CMake、pkg-config 与 protobuf compiler。
+需要 Git、Rust 1.99.1、protoc 和平台 C/C++ 构建工具。Windows 需要 MSVC，Linux 需要 OpenSSL、CMake、pkg-config 与 protobuf compiler。
 
 ```powershell
 cd drivers/codex-rs
 ./prepare-upstream.ps1
-cargo +1.97.0 build --release --locked
+cargo +1.99.1 build --release --locked
 ```
 
 `prepare-upstream.ps1 -Source <本地CPR仓库>` 可以复用本地源仓库。脚本固定 `upstream-lock.json` 的提交，核验维护补丁 SHA256，应用 `patches/0001-host-owned-transports.patch`。已有副本包含其他修改时拒绝覆盖；重复执行已应用同一补丁的副本是幂等的。`upstream/` 和 `target/` 不进入主仓库。
