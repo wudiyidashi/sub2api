@@ -783,10 +783,18 @@ async fn relay(
                     return;
                 }
                 Some(Ok(Message::Frame(_))) => {}
-                Some(Err(_)) | None => {
+                Some(Err(error)) => {
                     let _ = reader_output.control.try_send(failure(
                         &reader_state,
-                        "websocket_read",
+                        read_failure_code(Some(&error)),
+                        "upstream WebSocket read failed",
+                    ));
+                    return;
+                }
+                None => {
+                    let _ = reader_output.control.try_send(failure(
+                        &reader_state,
+                        read_failure_code(None),
                         "upstream WebSocket ended without a complete close",
                     ));
                     return;
@@ -830,6 +838,31 @@ async fn relay(
     }
 }
 
+// 宿主只透传失败码，读失败按错误类别细分，便于区分代理断连、TLS 与协议问题
+fn read_failure_code(error: Option<&tungstenite::Error>) -> &'static str {
+    use std::io::ErrorKind;
+    use tungstenite::{Error, error::ProtocolError};
+    match error {
+        None => "websocket_read_eof",
+        Some(Error::ConnectionClosed | Error::AlreadyClosed) => "websocket_read_closed",
+        Some(Error::Io(error)) => match error.kind() {
+            ErrorKind::ConnectionReset => "websocket_read_io_reset",
+            ErrorKind::ConnectionAborted => "websocket_read_io_aborted",
+            ErrorKind::UnexpectedEof => "websocket_read_io_eof",
+            ErrorKind::TimedOut => "websocket_read_io_timeout",
+            ErrorKind::BrokenPipe => "websocket_read_io_broken_pipe",
+            _ => "websocket_read_io",
+        },
+        Some(Error::Tls(_)) => "websocket_read_tls",
+        Some(Error::Capacity(_)) => "websocket_read_capacity",
+        Some(Error::Protocol(ProtocolError::ResetWithoutClosingHandshake)) => {
+            "websocket_read_reset_without_close"
+        }
+        Some(Error::Protocol(_)) => "websocket_read_protocol",
+        Some(_) => "websocket_read",
+    }
+}
+
 async fn drain_close<S>(source: &mut S)
 where
     S: Stream<Item = Result<Message, tungstenite::Error>> + Unpin,
@@ -842,4 +875,76 @@ where
         }
     })
     .await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::read_failure_code;
+    use std::io;
+    use tokio_tungstenite::tungstenite::{
+        Error,
+        error::{CapacityError, ProtocolError},
+    };
+
+    #[test]
+    fn read_failure_code_classifies_upstream_errors() {
+        let io_error = |kind| Error::Io(io::Error::new(kind, "test"));
+        let cases = [
+            (None, "websocket_read_eof"),
+            (Some(Error::ConnectionClosed), "websocket_read_closed"),
+            (Some(Error::AlreadyClosed), "websocket_read_closed"),
+            (
+                Some(io_error(io::ErrorKind::ConnectionReset)),
+                "websocket_read_io_reset",
+            ),
+            (
+                Some(io_error(io::ErrorKind::ConnectionAborted)),
+                "websocket_read_io_aborted",
+            ),
+            (
+                Some(io_error(io::ErrorKind::UnexpectedEof)),
+                "websocket_read_io_eof",
+            ),
+            (
+                Some(io_error(io::ErrorKind::TimedOut)),
+                "websocket_read_io_timeout",
+            ),
+            (
+                Some(io_error(io::ErrorKind::BrokenPipe)),
+                "websocket_read_io_broken_pipe",
+            ),
+            (
+                Some(io_error(io::ErrorKind::InvalidData)),
+                "websocket_read_io",
+            ),
+            (
+                Some(Error::Capacity(CapacityError::MessageTooLong {
+                    size: 2,
+                    max_size: 1,
+                })),
+                "websocket_read_capacity",
+            ),
+            (
+                Some(Error::Protocol(ProtocolError::ResetWithoutClosingHandshake)),
+                "websocket_read_reset_without_close",
+            ),
+            (
+                Some(Error::Protocol(ProtocolError::MaskedFrameFromServer)),
+                "websocket_read_protocol",
+            ),
+            (Some(Error::AttackAttempt), "websocket_read"),
+        ];
+        for (error, expected) in cases {
+            let code = read_failure_code(error.as_ref());
+            assert_eq!(code, expected, "{error:?}");
+            // 宿主 safeFailureCode 只接受 64 字节内的 [a-z0-9_-]
+            assert!(code.len() <= 64);
+            assert!(
+                code.bytes().all(|b| b.is_ascii_lowercase()
+                    || b.is_ascii_digit()
+                    || b == b'_'
+                    || b == b'-')
+            );
+        }
+    }
 }
