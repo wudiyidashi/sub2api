@@ -1336,7 +1336,7 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 			},
 			OnTrace: func(event openaiwsv2.RelayTraceEvent) {
 				logOpenAIWSV2Passthrough(
-					"relay_trace account_id=%d stage=%s direction=%s msg_type=%s bytes=%d graceful=%v wrote_downstream=%v err=%s",
+					"relay_trace account_id=%d stage=%s direction=%s msg_type=%s bytes=%d graceful=%v wrote_downstream=%v err=%s detail=%s",
 					account.ID,
 					truncateOpenAIWSLogValue(event.Stage, openAIWSLogValueMaxLen),
 					truncateOpenAIWSLogValue(event.Direction, openAIWSLogValueMaxLen),
@@ -1345,6 +1345,7 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 					event.Graceful,
 					event.WroteDownstream,
 					truncateOpenAIWSLogValue(event.Error, openAIWSLogValueMaxLen),
+					truncateOpenAIWSLogValue(event.Detail, openAIWSLogValueMaxLen),
 				)
 			},
 		},

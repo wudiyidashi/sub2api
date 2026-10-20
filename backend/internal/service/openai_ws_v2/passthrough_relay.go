@@ -98,6 +98,8 @@ type RelayTraceEvent struct {
 	Graceful        bool
 	WroteDownstream bool
 	Error           string
+	// Detail 只描述帧结构（事件类型与关键字段是否存在），不包含业务内容
+	Detail string
 }
 
 type relayState struct {
@@ -517,8 +519,41 @@ func runClientToUpstream(
 		if forwardedFrames != nil {
 			forwardedFrames.Add(1)
 		}
+		emitRelayTrace(onTrace, RelayTraceEvent{
+			Stage:        "client_frame_forwarded",
+			Direction:    "client_to_upstream",
+			MessageType:  relayMessageTypeString(msgType),
+			PayloadBytes: len(payload),
+			Detail:       describeClientFrame(payload),
+		})
 		markActivity()
 	}
+}
+
+// describeClientFrame 用于定位多轮会话异常，只输出帧类型与字段存在性
+func describeClientFrame(payload []byte) string {
+	if !gjson.ValidBytes(payload) {
+		return "non_json"
+	}
+	frameType := strings.TrimSpace(gjson.GetBytes(payload, "type").String())
+	if frameType == "" {
+		frameType = "-"
+	}
+	generate := "-"
+	if value := gjson.GetBytes(payload, "generate"); value.Exists() {
+		generate = strconv.FormatBool(value.Bool())
+	}
+	return "type=" + truncateRelayDetail(frameType) +
+		" previous_response_id=" + strconv.FormatBool(gjson.GetBytes(payload, "previous_response_id").String() != "") +
+		" generate=" + generate
+}
+
+func truncateRelayDetail(value string) string {
+	const maxLen = 64
+	if len(value) > maxLen {
+		return value[:maxLen]
+	}
+	return value
 }
 
 func runUpstreamToClient(

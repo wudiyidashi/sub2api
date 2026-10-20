@@ -103,6 +103,40 @@ func TestRunClientToUpstream_ErrorPaths(t *testing.T) {
 		require.Equal(t, int64(1), forwarded.Load())
 		require.NotEmpty(t, traces)
 	})
+
+	t.Run("forwarded frame trace describes client frame shape", func(t *testing.T) {
+		t.Parallel()
+
+		exitCh := make(chan relayExitSignal, 1)
+		var traces []RelayTraceEvent
+		runClientToUpstream(
+			context.Background(),
+			newPassthroughTestFrameConn([]passthroughTestFrame{
+				{msgType: coderws.MessageText, payload: []byte(`{"type":"response.create","previous_response_id":"resp_1","generate":false,"input":[{"content":"secret"}]}`)},
+				{msgType: coderws.MessageText, payload: []byte(`{"type":"response.create","input":[]}`)},
+				{msgType: coderws.MessageBinary, payload: []byte{0x00, 0x01}},
+			}, true),
+			nil,
+			func(_ coderws.MessageType, _ []byte) error { return nil },
+			func() {},
+			nil,
+			func(event RelayTraceEvent) {
+				if event.Stage == "client_frame_forwarded" {
+					traces = append(traces, event)
+				}
+			},
+			exitCh,
+		)
+		<-exitCh
+		require.Len(t, traces, 3)
+		require.Equal(t, "text", traces[0].MessageType)
+		require.Equal(t, "type=response.create previous_response_id=true generate=false", traces[0].Detail)
+		require.NotContains(t, traces[0].Detail, "secret")
+		require.Equal(t, "type=response.create previous_response_id=false generate=-", traces[1].Detail)
+		require.Equal(t, "binary", traces[2].MessageType)
+		require.Equal(t, 2, traces[2].PayloadBytes)
+		require.Equal(t, "non_json", traces[2].Detail)
+	})
 }
 
 func TestRunUpstreamToClient_ErrorAndDropPaths(t *testing.T) {

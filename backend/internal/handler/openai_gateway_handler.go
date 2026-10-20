@@ -2476,6 +2476,11 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		)
 		return
 	}
+	reqLog.Info("openai.websocket_ingress_accepted",
+		zap.String("request_user_agent", userAgent),
+		zap.String("requested_extensions", strings.TrimSpace(c.GetHeader("Sec-WebSocket-Extensions"))),
+		zap.String("negotiated_extensions", strings.TrimSpace(c.Writer.Header().Get("Sec-WebSocket-Extensions"))),
+	)
 	defer func() {
 		_ = wsConn.CloseNow()
 	}()
