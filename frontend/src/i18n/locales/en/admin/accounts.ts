@@ -1,5 +1,10 @@
 export default {
     accounts: {
+      requestEnvironment: {
+        title: 'Request egress environment', retry: 'Check again', loading: 'Detecting location and time zone through the selected egress…', failed: 'Unable to detect egress environment',
+        hint: 'Aligns request time zone, local date and search location with the actual egress. Location snapshots expire after 15 minutes; proxy changes trigger detection. Codex requests stop if detection fails. Working directories and ordinary prompts are preserved.',
+      },
+
       title: 'Account Management',
       description: 'Manage AI platform accounts and credentials',
       createAccount: 'Create Account',

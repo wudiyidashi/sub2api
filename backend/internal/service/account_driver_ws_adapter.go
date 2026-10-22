@@ -252,6 +252,7 @@ func (c *managedOpenAIWSClientConn) MayHaveSentBusiness() bool           { retur
 
 func normalizeManagedWSCompatibility(req openAIWSAcquireRequest) openAIWSHandshakeCompatibilityKey {
 	key := normalizeOpenAIWSHandshakeCompatibility(req.Account, req.Headers)
+	key.requestEnvironment = req.RequestEnvironment
 	if usesCodexHTTPDriver(req.Account) {
 		key.managedScope = req.ManagedScope
 		key.managedDriver = req.Account.EffectiveAccountDriverID()

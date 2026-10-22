@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('../CodexRequestEnvironment.vue', () => ({ default: { template: '<div />' } }))
+
 import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import {

@@ -23,6 +23,9 @@ func RegisterAdminRoutes(
 	// 插件 UI 使用短时能力 URL，仅提供经过安装校验的静态资源。
 	v1.GET("/plugin-ui/:token/*path", h.Admin.Plugin.ServeUIAsset)
 
+	if h.Admin.Account != nil {
+		h.Admin.Account.SetRequestEnvironments(settingService.RequestEnvironments())
+	}
 	admin := v1.Group("/admin")
 	admin.Use(gin.HandlerFunc(adminAuth))
 	// 面板全局按用户限流（默认管理员豁免，可在系统设置中关闭豁免）
@@ -38,6 +41,7 @@ func RegisterAdminRoutes(
 		registerDashboardRoutes(admin, h)
 
 		// Team consumption dashboard uses the same admin authentication and audit policy.
+		admin.GET("/accounts/:id/request-environment", h.Admin.Account.GetRequestEnvironment)
 		admin.GET("/team-stats/config", h.Admin.Setting.GetTeamStatsConfig)
 		admin.PUT("/team-stats/config", h.Admin.Setting.UpdateTeamStatsConfig)
 

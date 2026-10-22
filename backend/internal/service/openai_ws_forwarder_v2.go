@@ -44,6 +44,11 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 	if s == nil || account == nil {
 		return nil, wrapOpenAIWSFallback("invalid_state", errors.New("service or account is nil"))
 	}
+	var environmentErr error
+	ctx, environmentErr = s.pinCodexEnvironment(ctx, account)
+	if environmentErr != nil {
+		return nil, environmentErr
+	}
 	responseModelObserver := &upstreamResponseModelObserver{}
 
 	wsURL, err := s.buildOpenAIResponsesWSURL(account)
@@ -69,6 +74,19 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 	)
 
 	payload := s.buildOpenAIWSCreatePayload(reqBody, account)
+	if raw, marshalErr := json.Marshal(payload); marshalErr != nil {
+		return nil, marshalErr
+	} else {
+		aligned, alignErr := s.alignCodexEnvironmentBody(ctx, account, raw)
+		if alignErr != nil {
+			return nil, alignErr
+		}
+		if !bytes.Equal(raw, aligned) {
+			if err := json.Unmarshal(aligned, &payload); err != nil {
+				return nil, err
+			}
+		}
+	}
 	payloadStrategy, removedKeys := applyOpenAIWSRetryPayloadStrategy(payload, attempt)
 	turnState := ""
 	turnMetadata := ""
@@ -209,6 +227,7 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 	defer acquireCancel()
 
 	lease, err := s.getOpenAIWSConnPool().Acquire(acquireCtx, openAIWSAcquireRequest{
+		RequestEnvironment:           codexEnvironmentPoolKey(ctx),
 		ManagedScope:                 managedAccountWSScope(c, nil, sessionHash),
 		ManagedGeneration:            AccountDriverRuntimeGeneration(),
 		ManagedGenerationCanContinue: s.accountDriverGenerationCanContinue(),

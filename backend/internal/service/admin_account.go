@@ -590,6 +590,7 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 		}
 	}
 
+	s.settingService.warmCodexRequestEnvironment(account)
 	return account, nil
 }
 
@@ -976,6 +977,7 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	if err != nil {
 		return nil, err
 	}
+	s.settingService.warmCodexRequestEnvironment(updated)
 	return updated, nil
 }
 

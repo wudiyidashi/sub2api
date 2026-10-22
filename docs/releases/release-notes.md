@@ -41,3 +41,9 @@
 - Improved Responses compatibility for strict clients, corrected Zhipu quota windows, and isolated Codex imports by workspace.
 - Restored inline account filters, including enhanced-driver filtering.
 - Updated the enhanced Codex transport to CPR v3.29.3 with TLS and archive dependency security fixes.
+
+### 2026-10-22
+
+- Codex accounts now detect location through their actual outbound proxy and align request timezone, local date, region, and search location for HTTP and WebSocket requests.
+- Account editing now previews the selected exit IP and timezone, with manual refresh. Failed detection stops Codex requests instead of using an outdated location.
+- Use a fixed or sticky proxy exit for consistent location; operating system, workspace paths, and language preferences retain their actual values.

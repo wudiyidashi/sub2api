@@ -68,8 +68,9 @@ func (e *openAIWSDialError) Unwrap() error {
 }
 
 type openAIWSAcquireRequest struct {
-	ManagedScope      string
-	ManagedGeneration uint64
+	RequestEnvironment string
+	ManagedScope       string
+	ManagedGeneration  uint64
 	// ManagedGenerationCanContinue validates a preferred connection's runtime
 	// generation after a hot upgrade. Fresh dials always use the active
 	// generation above; only an existing continuation may use a retired one.
@@ -90,6 +91,7 @@ type openAIWSAcquireRequest struct {
 }
 
 type openAIWSHandshakeCompatibilityKey struct {
+	requestEnvironment  string
 	managedScope        string
 	managedAuth         string
 	managedDriver       string

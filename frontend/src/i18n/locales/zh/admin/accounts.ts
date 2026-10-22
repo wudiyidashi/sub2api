@@ -1,5 +1,10 @@
 export default {
     accounts: {
+      requestEnvironment: {
+        title: '请求出口环境', retry: '重新检查', loading: '正在通过所选出口识别地域与时区…', failed: '无法识别出口环境',
+        hint: '按真实出口对齐请求时区、当地日期和搜索位置。地域快照有效期 15 分钟；代理变更立即重新识别。探测失败时暂停发送 Codex 请求，工作目录和普通提示词保持原样。',
+      },
+
       title: '账号管理',
       description: '管理 AI 平台账号和 Cookie',
       createAccount: '添加账号',

@@ -1794,6 +1794,11 @@
           <ProxyAdBanner />
         </div>
         <ProxySelector v-model="form.proxy_id" :proxies="proxies" />
+        <CodexRequestEnvironment
+          v-if="show && account?.id && account.platform === 'openai' && (account.type === 'oauth' || account.type === 'setup-token')"
+          :account-id="account.id"
+          :proxy-id="form.proxy_id"
+        />
       </div>
 
       <UpstreamRequestIdHeaderField
@@ -3287,6 +3292,7 @@ import UpstreamRequestIdHeaderField from '@/components/account/UpstreamRequestId
 import Toggle from '@/components/common/Toggle.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
+import CodexRequestEnvironment from './CodexRequestEnvironment.vue'
 import ProxyAdBanner from '@/components/common/ProxyAdBanner.vue'
 import GroupSelector from '@/components/common/GroupSelector.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'

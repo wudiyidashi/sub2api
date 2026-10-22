@@ -49,6 +49,7 @@ func NewOAuthHandler(oauthService *service.OAuthService) *OAuthHandler {
 
 // AccountHandler handles admin account management
 type AccountHandler struct {
+	requestEnvironments     *service.AccountRequestEnvironmentService
 	claudeResetCredits      claudeResetReader
 	adminService            service.AdminService
 	accountDriverRuntime    *service.AccountDriverManager

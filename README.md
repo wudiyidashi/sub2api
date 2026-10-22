@@ -29,15 +29,11 @@ Please read the following carefully before using this project:
 
 ## 最新更新
 
-### 2026-10-19
+### 2026-10-22
 
-- Added Gemini 4 Argon discovery and pricing, with thinking-level forwarding and streamed thought summaries on compatibility endpoints.
-- Added a configurable minimum output-token allowance for compatibility requests.
-- Fixed composite-group OAuth routing and adapted model availability to the GPT-5.5 retirement on ChatGPT subscription accounts.
-- Improved payment confirmation, Stripe order resumption, and pending refund accounting.
-- Improved Responses compatibility for strict clients, corrected Zhipu quota windows, and isolated Codex imports by workspace.
-- Restored inline account filters, including enhanced-driver filtering.
-- Updated the enhanced Codex transport to CPR v3.29.3 with TLS and archive dependency security fixes.
+- Codex accounts now detect location through their actual outbound proxy and align request timezone, local date, region, and search location for HTTP and WebSocket requests.
+- Account editing now previews the selected exit IP and timezone, with manual refresh. Failed detection stops Codex requests instead of using an outdated location.
+- Use a fixed or sticky proxy exit for consistent location; operating system, workspace paths, and language preferences retain their actual values.
 
 完整更新记录见 [docs/releases/release-notes.md](docs/releases/release-notes.md)。
 

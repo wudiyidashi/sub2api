@@ -26,6 +26,8 @@ Linux 使用 `sh prepare-upstream.sh [本地CPR仓库]`，需要 Git 和 Python 
 
 宿主交付最终 URL、原始 body 和多值 headers。身份 callback 只覆盖 Authorization 与 ChatGPT account ID，其余未知 headers 保留；Connection、Proxy-Connection、Transfer-Encoding、Upgrade 等传输分帧头需由宿主在准备阶段移除。驱动不会二次 JSON 解码、改变 stream、重建历史或自动压缩正文。HTTP 401/429 等仍按原始状态、完整 headers、raw body 返回，由宿主沿用现有处理和计费。
 
+宿主在交付 Codex 请求之前通过账号的真实出口探测地域，统一已识别环境上下文的时区、当地日期与地域字段，以及搜索工具的位置。原生与增强 HTTP/WS 使用相同策略；该处理归宿主所有，驱动仍传输准备好的正文。详见[出口环境说明](../../docs/operations/codex-request-environment.md)。
+
 调用次序是 `start → ready/not_sent → permit_send → ambiguous → head/sent → body → end`。宿主必须先记录 `ambiguous` 再发送 permit，直到响应结束都保留输入流；输入 EOF、cancel 或 RPC context 取消会终止上游请求。`header_timeout_ms` 只等待上游响应头，超时返回 `response_header_timeout` 和 ambiguous；一旦 head 已交付，body 流不再受该时限影响。进程在许可后异常退出时不能推断为未发送。驱动不执行重试。
 
 输入 body 上限 256 MiB，gRPC 解码上限保留额外 1 MiB wire 开销；响应 body 按最大 64 KiB 分段。有界队列和独立取消输入保证响应背压不阻止取消。连接超时 10 秒，`timeout_ms=0` 不设置总请求超时，正值按该 attempt 限制。

@@ -32,6 +32,16 @@ func TestAccountDriverRoutesRequireAdminAuthentication(t *testing.T) {
 	for _, tc := range []struct {
 		auth string
 		code int
+	}{{"", http.StatusUnauthorized}, {"Bearer user", http.StatusForbidden}} {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/1/request-environment", nil)
+		req.Header.Set("Authorization", tc.auth)
+		router.ServeHTTP(rec, req)
+		require.Equal(t, tc.code, rec.Code, rec.Body.String())
+	}
+	for _, tc := range []struct {
+		auth string
+		code int
 	}{{"", http.StatusUnauthorized}, {"Bearer user", http.StatusForbidden}, {"Bearer admin", http.StatusOK}} {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/account-drivers", nil)
