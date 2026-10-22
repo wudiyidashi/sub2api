@@ -41,7 +41,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'pnpm'
           cache-dependency-path: frontend/pnpm-lock.yaml
       - name: Install dependencies
@@ -55,4 +55,15 @@ jobs:
         run: |
           python tools/check_pnpm_audit_exceptions.py \
             --audit frontend/audit.json \
+            --exceptions .github/audit-exceptions.yml
+      - name: Install CPR console dependencies
+        working-directory: frontend
+        run: node subprojects/cpr-console/run.mjs install
+      - name: Audit CPR console dependencies
+        working-directory: frontend/subprojects/cpr-console/.upstream/build/frontend
+        run: npx --yes pnpm@12.6.0 audit --prod --audit-level=high --json > ../../../../../audit-cpr.json || true
+      - name: Check CPR console audit exceptions
+        run: |
+          python tools/check_pnpm_audit_exceptions.py \
+            --audit frontend/audit-cpr.json \
             --exceptions .github/audit-exceptions.yml

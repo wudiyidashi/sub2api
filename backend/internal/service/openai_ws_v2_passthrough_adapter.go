@@ -824,7 +824,13 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 	usageMeta.captureRequestedReasoningEffort(originalFirstClientMessage, capturedSessionModel)
 	_, initialUpstreamModel := usageMeta.turnModels(initialRequestModel)
 	SetOpsUpstreamModel(c, initialUpstreamModel)
-	wsURL, err := s.buildOpenAIResponsesWSURL(account)
+	cprBinding, cprManaged := cprBindingFromContext(ctx)
+	wsURL, err := "", error(nil)
+	if cprManaged {
+		wsURL = cprBinding.service.client.WebSocketURL()
+	} else {
+		wsURL, err = s.buildOpenAIResponsesWSURL(account)
+	}
 	if err != nil {
 		return fmt.Errorf("build ws url: %w", err)
 	}
@@ -877,6 +883,9 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 	}
 
 	dialer := s.getOpenAIWSPassthroughDialer()
+	if cprManaged {
+		dialer = cprExecutionWSDialer{binding: cprBinding}
+	}
 	if dialer == nil {
 		return errors.New("openai ws passthrough dialer is nil")
 	}
@@ -896,6 +905,9 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 		cancelDial()
 		if err == nil {
 			break
+		}
+		if cprManaged {
+			return errors.New("CPR websocket execution failed; host retry is disabled")
 		}
 		var handshakeErr *openAIWSHandshakeError
 		responseBody := []byte(nil)

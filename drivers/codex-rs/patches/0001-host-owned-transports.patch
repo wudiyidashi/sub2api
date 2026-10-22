@@ -1,5 +1,5 @@
 diff --git a/backend/crates/providers/openai/src/transport/client.rs b/backend/crates/providers/openai/src/transport/client.rs
-index 5fe0dc60..b34564a3 100644
+index 5fe0dc60c4dc7c17674b8f8d3402f7e9136a955c..b34564a3fa0e2721aaade294e441f90d523cbf25 100644
 --- a/backend/crates/providers/openai/src/transport/client.rs
 +++ b/backend/crates/providers/openai/src/transport/client.rs
 @@ -60,7 +60,7 @@ pub fn build_account_http_client(
@@ -40,7 +40,7 @@ index 5fe0dc60..b34564a3 100644
      pub(crate) fn with_timezone(
          mut self,
 diff --git a/backend/crates/providers/openai/src/transport/websocket/handshake.rs b/backend/crates/providers/openai/src/transport/websocket/handshake.rs
-index 91d5704c..26ce9986 100644
+index 91d5704cd276d5adbdf13292fcacbb151d7e2848..26ce9986d974b15d0da1302c112ac9b23595590f 100644
 --- a/backend/crates/providers/openai/src/transport/websocket/handshake.rs
 +++ b/backend/crates/providers/openai/src/transport/websocket/handshake.rs
 @@ -172,14 +172,6 @@ async fn connect_websocket(
@@ -220,7 +220,7 @@ index 91d5704c..26ce9986 100644
      config.extensions = extensions;
      config
 diff --git a/backend/crates/providers/openai/src/transport/websocket/mod.rs b/backend/crates/providers/openai/src/transport/websocket/mod.rs
-index fe4071be..7c87dce7 100644
+index fe4071beffc39f63071afe5c17236a6fda2fc0bd..7c87dce750ff462a8b63f1ab265609a6a7911ebc 100644
 --- a/backend/crates/providers/openai/src/transport/websocket/mod.rs
 +++ b/backend/crates/providers/openai/src/transport/websocket/mod.rs
 @@ -26,7 +26,7 @@ pub use self::{
@@ -242,7 +242,7 @@ index fe4071be..7c87dce7 100644
  pub(crate) use self::{
      coordinator::{
 diff --git a/backend/crates/providers/openai/src/transport/websocket/model.rs b/backend/crates/providers/openai/src/transport/websocket/model.rs
-index e23f174c..0495aa8f 100644
+index e23f174c4953e087ae2b8a7757fa871bb4c20aad..0495aa8fa2559f7dbda4ddafbf2a296149e2ab65 100644
 --- a/backend/crates/providers/openai/src/transport/websocket/model.rs
 +++ b/backend/crates/providers/openai/src/transport/websocket/model.rs
 @@ -146,4 +146,13 @@ impl CodexWebSocketConnection {
@@ -260,7 +260,7 @@ index e23f174c..0495aa8f 100644
 +    }
  }
 diff --git a/backend/crates/providers/openai/src/transport/websocket/pump.rs b/backend/crates/providers/openai/src/transport/websocket/pump.rs
-index db4e2f81..37d4a827 100644
+index db4e2f8168dbcb7a4f76d9ee732150e9bc62053a..37d4a827d1ce41ecdfe63489152338109df5ef52 100644
 --- a/backend/crates/providers/openai/src/transport/websocket/pump.rs
 +++ b/backend/crates/providers/openai/src/transport/websocket/pump.rs
 @@ -36,7 +36,7 @@ use super::{

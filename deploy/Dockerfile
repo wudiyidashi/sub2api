@@ -18,6 +18,7 @@ ARG GOSUMDB=sum.golang.google.cn
 FROM ${NODE_IMAGE} AS frontend-builder
 
 WORKDIR /app/frontend
+RUN apk add --no-cache git python3
 ENV NODE_OPTIONS=--max-old-space-size=1536
 
 # Install pnpm. Keep this pinned to the lockfile-compatible major version so
@@ -34,6 +35,7 @@ RUN pnpm install --frozen-lockfile
 # in the image (WORKDIR /app/frontend -> resolves to /app/docs/legal/*.md).
 # Copy only that subtree to keep the build dependency minimal.
 COPY frontend/ ./
+COPY backend/internal/cpr/management-endpoints.json /app/backend/internal/cpr/management-endpoints.json
 COPY docs/legal/ /app/docs/legal/
 RUN pnpm run build
 

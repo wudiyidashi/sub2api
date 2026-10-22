@@ -1,0 +1,302 @@
+{
+  "source_commit": "78bc57c5cf24b01a38e985cdd739bb4ae89ce11f",
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/admin/diagnostics/export",
+      "kind": "download",
+      "sensitive": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/settings/client-downloads/codex-desktop/windows",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/account-groups",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/account-groups/options",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/accounts",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/accounts/concurrency",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/accounts/connection-test",
+      "kind": "stream"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/accounts/detail",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/accounts/export",
+      "kind": "json",
+      "sensitive": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/accounts/import-tasks",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/accounts/import-tasks/detail",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/accounts/models",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/accounts/models/catalog",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/accounts/personal-info",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/accounts/profile-avatar",
+      "kind": "binary"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/accounts/quota",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/accounts/quota-forecast",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/accounts/reset-credits",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/accounts/reset-credits/automation",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/proxies",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/proxies/accounts",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/settings",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/settings/client-profiles/openai",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/settings/client-profiles/xai",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/usage/insights/diagnostics",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/usage/insights/overview",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/usage/records",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/usage/records/detail",
+      "kind": "json"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/usage/records/summary",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/account-groups/create",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/account-groups/delete",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/account-groups/disable",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/account-groups/enable",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/account-groups/update",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/accounts/batch-update",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/accounts/delete",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/accounts/import",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/accounts/import-tasks",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/accounts/import-tasks/stop",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/accounts/models/refresh",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/accounts/oauth/complete",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/accounts/oauth/start",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/accounts/quota/refresh",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/accounts/recover",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/accounts/refresh",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/accounts/reset-credits",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/accounts/reset-credits/automation",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/accounts/update",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/proxies/accounts/remove",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/proxies/create",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/proxies/delete",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/proxies/probe",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/proxies/test",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/proxies/update",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/settings/client-profiles/openai/preview",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/settings/client-profiles/xai/preview",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/settings/location/detect",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/settings/privacy/preview",
+      "kind": "json"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/settings/update",
+      "kind": "json"
+    }
+  ]
+}

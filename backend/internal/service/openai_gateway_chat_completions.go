@@ -61,6 +61,14 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 	promptCacheKey string,
 	defaultMappedModel string,
 ) (*OpenAIForwardResult, error) {
+	if account.IsCPRManaged() {
+		preparedCtx, prepared, err := s.prepareCPRGatewayAccount(ctx, c, account)
+		if err != nil {
+			return nil, err
+		}
+		result, err := s.ForwardAsChatCompletions(preparedCtx, c, prepared, body, promptCacheKey, defaultMappedModel)
+		return finishCPRGatewayResult(preparedCtx, c, result, err)
+	}
 	ctx, releaseDriverOperation, admissionErr := acquireOpenAIAccountDriverOperation(ctx, account)
 	if admissionErr != nil {
 		return nil, admissionErr

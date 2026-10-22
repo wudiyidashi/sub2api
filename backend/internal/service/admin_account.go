@@ -492,6 +492,9 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 }
 
 func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccountInput) (*Account, error) {
+	if s.settingService != nil && s.settingService.CPRPools() != nil && s.settingService.CPRPools().client != nil && (input.Platform == PlatformOpenAI || input.Platform == PlatformGrok) {
+		return nil, infraerrors.BadRequest("CPR_ACCOUNT_MANAGEMENT_REQUIRED", "create managed platform accounts in the CPR account pool module")
+	}
 	if err := ValidateAccountDriverSelection(input.AccountDriverID, input.DriverSettings); err != nil {
 		return nil, err
 	}

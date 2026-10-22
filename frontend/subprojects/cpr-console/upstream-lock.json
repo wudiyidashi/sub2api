@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/zyycn/codex-proxy-rs.git",
+  "commit": "78bc57c5cf24b01a38e985cdd739bb4ae89ce11f",
+  "tag": "v3.29.7",
+  "source_directory": "frontend",
+  "package_manager": "pnpm@12.6.0",
+  "owner": "Sub2API admin authentication and CPR account pool",
+  "source_file_sha256": {
+    "pnpm-lock.yaml": "9a5a91d3c5ee3e322e0c9ebebbb5ac77c5181142de30f2ba98f64006f4f4f27e",
+    "pnpm-workspace.yaml": "2dc74522b9076b7ed89624d0fb229e4b59f083c45cc887b29991e510fdad76ff"
+  }
+}

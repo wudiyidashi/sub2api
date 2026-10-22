@@ -165,6 +165,7 @@ export default {
   nav: {
     dashboard: 'Dashboard',
     teamStats: 'Team Consumption',
+    cprAccountPools: 'CPR Account Pools',
     announcements: 'Announcements',
     apiKeys: 'API Keys',
     batchImage: 'Batch Images',

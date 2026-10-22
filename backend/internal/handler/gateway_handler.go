@@ -1166,6 +1166,20 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 		h.pinnedOpenAIModels(c, apiKey.Group)
 		return
 	}
+	if platform == service.PlatformOpenAI || platform == service.PlatformGrok {
+		ids, managed, err := h.openAIGatewayService.CPRModelIDs(c.Request.Context(), c, platform)
+		if err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": gin.H{"type": "upstream_error", "message": "CPR model catalog is unavailable"}})
+			return
+		}
+		if managed {
+			if apiKey != nil && apiKey.Group != nil && apiKey.Group.ModelAllowlistEnabled() {
+				ids = apiKey.Group.ModelAllowlist.FilterForListing(ids)
+			}
+			writeModelsList(c, platform, ids)
+			return
+		}
+	}
 
 	if platform == service.PlatformComposite {
 		availableModels := h.compositeAvailableModels(c.Request.Context(), groupID, "", true)

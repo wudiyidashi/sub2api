@@ -165,6 +165,7 @@ export default {
   nav: {
     dashboard: '仪表盘',
     teamStats: '团队消耗看板',
+    cprAccountPools: 'CPR 账号池',
     announcements: '公告',
     apiKeys: 'API 密钥',
     batchImage: '批量生图',

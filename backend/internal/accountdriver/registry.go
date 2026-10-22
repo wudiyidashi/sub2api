@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	NativeID    = "native"
-	CodexHTTPID = "codex-rs-http"
+	NativeID     = "native"
+	CodexHTTPID  = "codex-rs-http"
+	CPRManagedID = "cpr-managed"
 )
 
 // Capabilities describe driver operations, not permission to use every operation

@@ -176,6 +176,11 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       port: devPort,
       proxy: {
+        '/cpr-console': {
+          target: 'http://127.0.0.1:3174',
+          changeOrigin: true,
+          ws: true
+        },
         '/api': {
           target: backendUrl,
           changeOrigin: true

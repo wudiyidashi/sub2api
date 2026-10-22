@@ -36,6 +36,7 @@ func RegisterAdminRoutes(
 	{
 		// 部署与运营合规确认
 		registerAdminComplianceRoutes(admin, h)
+		registerCPRRoutes(admin, h, stepUpAuth)
 
 		// 仪表盘
 		registerDashboardRoutes(admin, h)

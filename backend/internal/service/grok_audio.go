@@ -32,6 +32,9 @@ var supportedGrokVoiceHTTPEndpoints = map[string]struct{}{
 // The response is intentionally passed through because TTS returns audio bytes
 // while STT returns JSON and xAI may add format-specific headers.
 func (s *OpenAIGatewayService) ForwardGrokVoice(ctx context.Context, c *gin.Context, account *Account, endpoint string, body []byte, contentType string) (*OpenAIForwardResult, error) {
+	if account.IsCPRManaged() {
+		return nil, writeCPRUnsupportedEndpoint(c, "Grok voice")
+	}
 	if s == nil || account == nil {
 		return nil, fmt.Errorf("grok voice service/account is required")
 	}

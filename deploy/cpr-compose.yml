@@ -1,0 +1,92 @@
+name: sub2api-cpr
+
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+services:
+  cpr-postgres:
+    image: postgres:18-bookworm@sha256:d9c83446333daec3f0588cc709adb80c26090b7f9f0f7ec8d43c243385d79818
+    container_name: sub2api-cpr-db
+    restart: unless-stopped
+    env_file: ./cpr/secrets.env
+    environment:
+      POSTGRES_USER: sub2api_cpr
+      POSTGRES_DB: sub2api_cpr
+      TZ: UTC
+    command: [postgres, -c, shared_buffers=32MB, -c, max_connections=30, -c, work_mem=2MB]
+    volumes:
+      - ./cpr/postgres:/var/lib/postgresql
+    networks: [cpr-private]
+    mem_limit: 192m
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U sub2api_cpr -d sub2api_cpr]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *bounded-logging
+    security_opt: [no-new-privileges:true]
+
+  cpr-redis:
+    image: redis:8-alpine
+    container_name: sub2api-cpr-redis
+    restart: unless-stopped
+    env_file: ./cpr/secrets.env
+    command: [sh, -ec, 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD" --maxmemory 48mb --maxmemory-policy noeviction']
+    volumes:
+      - ./cpr/redis:/data
+    networks: [cpr-private]
+    mem_limit: 96m
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *bounded-logging
+    security_opt: [no-new-privileges:true]
+
+  cpr-gateway:
+    image: ${CPR_IMAGE:-ghcr.io/zyycn/codex-proxy-rs:3.29.7}
+    container_name: sub2api-cpr
+    restart: unless-stopped
+    init: true
+    user: '10001:10001'
+    stop_grace_period: 75s
+    depends_on:
+      cpr-postgres: {condition: service_healthy}
+      cpr-redis: {condition: service_healthy}
+    volumes:
+      - ./cpr/config.yaml:/app/deploy/config.yaml:ro
+      - ./cpr/data:/app/.runtime/data
+      - ./cpr/logs:/app/.runtime/logs
+    networks:
+      cpr-private: {}
+      sub2api: {aliases: [cpr-gateway]}
+    environment:
+      CPR_SERVER_HOST: 0.0.0.0
+      CPR_SERVER_PORT: '8080'
+      CPR_DATABASE_URL: postgres://sub2api_cpr@cpr-postgres:5432/sub2api_cpr
+      CPR_REDIS_URL: redis://cpr-redis:6379/0
+      CPR_WEB_DIST_DIR: /app/web/dist
+      GLIBC_TUNABLES: glibc.malloc.mmap_threshold=131072:glibc.malloc.trim_threshold=131072
+    mem_limit: 320m
+    pids_limit: 256
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:size=64m,mode=1777']
+    healthcheck:
+      test: [CMD, curl, -fsS, http://127.0.0.1:8080/healthz]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 2m
+    logging: *bounded-logging
+
+networks:
+  cpr-private:
+    internal: true
+  sub2api:
+    external: true
+    name: ${SUB2API_NETWORK:-sub2api_sub2api-internal}

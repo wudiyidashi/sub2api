@@ -28,7 +28,7 @@ if git("rev-parse", "HEAD", capture=True) != lock["commit"]:
     raise SystemExit("Existing CPR checkout differs from the pinned commit; preserve it before preparing a separate checkout")
 if git("ls-files", "--others", "--exclude-standard", capture=True):
     raise SystemExit("CPR checkout contains untracked files; preserve them before preparing the dependency")
-diff = git("diff", "--no-ext-diff", capture=True)
+diff = git("diff", "--no-ext-diff", "--full-index", capture=True)
 if diff:
     if diff != patch.read_text(encoding="utf-8").strip():
         raise SystemExit("CPR checkout has changes beyond the maintained patch")

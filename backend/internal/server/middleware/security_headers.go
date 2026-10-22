@@ -130,7 +130,7 @@ func SecurityHeaders(cfg config.CSPConfig, getFrameSrcOrigins func() []string) g
 		c.Header("X-Content-Type-Options", "nosniff")
 		c.Header("X-Frame-Options", "DENY")
 		// Only the built-in dashboard document can be embedded by the same-origin admin UI.
-		if c.Request.URL.Path == "/team-stats/" || c.Request.URL.Path == "/team-stats/index.html" {
+		if c.Request.URL.Path == "/team-stats/" || c.Request.URL.Path == "/team-stats/index.html" || c.Request.URL.Path == "/cpr-console/" || c.Request.URL.Path == "/cpr-console/index.html" {
 			c.Header("X-Frame-Options", "SAMEORIGIN")
 			parts := strings.Split(finalPolicy, ";")
 			filtered := make([]string, 0, len(parts)+1)

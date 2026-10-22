@@ -458,6 +458,7 @@ type OpenAIGatewayService struct {
 	userGroupRateResolver *userGroupRateResolver
 	httpUpstream          HTTPUpstream
 	pluginManager         *PluginManager
+	cprPools              *CPRPoolService
 	deferredService       *DeferredService
 	openAITokenProvider   *OpenAITokenProvider
 	grokTokenProvider     *GrokTokenProvider
@@ -562,6 +563,7 @@ func NewOpenAIGatewayService(
 			"service.openai_gateway",
 		),
 		httpUpstream:          httpUpstream,
+		cprPools:              settingService.CPRPools(),
 		deferredService:       deferredService,
 		openAITokenProvider:   openAITokenProvider,
 		grokTokenProvider:     grokTokenProvider,

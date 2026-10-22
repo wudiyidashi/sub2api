@@ -68,7 +68,7 @@ const selectedDriver = computed(() => {
 })
 
 const options = computed(() => {
-  const result = drivers.value.map(driver => {
+  const result = drivers.value.filter(driver => driver.id !== 'cpr-managed' || props.modelValue === driver.id).map(driver => {
     const compatible = driver.platforms.includes(props.platform) && driver.account_types.includes(props.accountType)
     const integrated = driver.id === NATIVE_DRIVER_ID || driver.id === CODEX_HTTP_DRIVER_ID
     const disabled = !driver.available || !compatible || !integrated

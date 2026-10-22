@@ -71,6 +71,9 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 	firstClientMessage []byte,
 	hooks *OpenAIWSIngressHooks,
 ) (returnErr error) {
+	if account.IsCPRManaged() {
+		return s.proxyCPRWebSocket(ctx, c, clientConn, account, firstClientMessage, hooks)
+	}
 	ctx, hooks, maintenanceCleanup, maintenanceErr := wrapAccountDriverMaintenanceWSHooks(ctx, account, hooks)
 	if maintenanceErr != nil {
 		return maintenanceErr

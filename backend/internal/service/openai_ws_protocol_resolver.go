@@ -39,6 +39,9 @@ func (r *defaultOpenAIWSProtocolResolver) Resolve(account *Account) OpenAIWSProt
 	if account == nil {
 		return openAIWSHTTPDecision("account_missing")
 	}
+	if account.IsCPRManaged() {
+		return OpenAIWSProtocolDecision{Transport: OpenAIUpstreamTransportResponsesWebsocketV2, Reason: "cpr_managed_pool"}
+	}
 	if !account.IsOpenAI() {
 		return openAIWSHTTPDecision("platform_not_openai")
 	}

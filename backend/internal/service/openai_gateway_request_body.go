@@ -22,6 +22,10 @@ import (
 )
 
 func (s *OpenAIGatewayService) validateUpstreamBaseURL(raw string) (string, error) {
+	// CPR origin 来自独立服务配置且已校验，数据请求仍受固定路径和授权绑定约束。
+	if s != nil && s.cprPools != nil && s.cprPools.client != nil && raw == s.cprPools.config.BaseURL {
+		return strings.TrimRight(raw, "/"), nil
+	}
 	normalized, err := s.validateOutboundURL(raw)
 	if err != nil {
 		return "", fmt.Errorf("invalid base_url: %w", err)

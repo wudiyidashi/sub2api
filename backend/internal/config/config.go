@@ -143,6 +143,7 @@ type PluginConfig struct {
 // AccountDriversConfig enables explicitly selected managed account transports.
 type AccountDriversConfig struct {
 	CodexRSHTTP CodexRSHTTPDriverConfig `mapstructure:"codex_rs_http"`
+	CPRManaged  CPRManagedConfig        `mapstructure:"cpr_managed"`
 }
 
 type CodexRSHTTPDriverConfig struct {
@@ -2395,6 +2396,12 @@ func setDefaults() {
 	viper.SetDefault("account_drivers.codex_rs_http.executable_path", "")
 	viper.SetDefault("account_drivers.codex_rs_http.sha256", "")
 	viper.SetDefault("account_drivers.codex_rs_http.start_timeout_seconds", 10)
+	viper.SetDefault("account_drivers.cpr_managed.enabled", false)
+	viper.SetDefault("account_drivers.cpr_managed.base_url", "")
+	viper.SetDefault("account_drivers.cpr_managed.admin_api_key", "")
+	viper.SetDefault("account_drivers.cpr_managed.deployment_id", "")
+	viper.SetDefault("account_drivers.cpr_managed.bridge_secret", "")
+	viper.SetDefault("account_drivers.cpr_managed.admin_timeout_seconds", 30)
 
 	// Timezone (default to Asia/Shanghai for Chinese users)
 	viper.SetDefault("timezone", "Asia/Shanghai")
@@ -2746,6 +2753,9 @@ func setEnvReachableDefaults() {
 }
 
 func (c *Config) Validate() error {
+	if err := c.AccountDrivers.CPRManaged.Validate(); err != nil {
+		return err
+	}
 	if c.APIRequestAudit.RetentionHours < 0 || c.APIRequestAudit.RetentionHours > 8760 {
 		return fmt.Errorf("api_request_audit.retention_hours must be between 0 and 8760 (0 uses the default)")
 	}

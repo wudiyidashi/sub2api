@@ -409,6 +409,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: true, title: '团队消耗看板', titleKey: 'nav.teamStats' }
   },
   {
+    path: '/admin/cpr',
+    name: 'AdminCPRAccountPool',
+    component: () => import('@/views/admin/CPRAccountPoolView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, title: 'CPR 账号池' }
+  },
+  {
     path: '/admin/dashboard',
     name: 'AdminDashboard',
     component: () => import('@/views/admin/DashboardView.vue'),

@@ -93,6 +93,10 @@ type grokCredentialConditionalStateRepository interface {
 // GetRequestCredential applies the request-path credential and failover contract
 // before any upstream transport is opened.
 func (s *OpenAIGatewayService) GetRequestCredential(ctx context.Context, c *gin.Context, account *Account) (string, string, error) {
+	// WS 握手只需要占位协议身份，真正的授权 Key 在执行边界按当前业务权限生成。
+	if account.IsCPRManaged() {
+		return "cpr-managed-pool", "cpr-managed", nil
+	}
 	return s.getRequestCredential(ctx, c, account)
 }
 

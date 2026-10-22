@@ -14,7 +14,7 @@ $actual = & git -C $upstreamPath rev-parse HEAD
 if ($actual -ne $lock.commit) { throw 'Existing CPR checkout is at a different commit; preserve it and prepare a separate pinned checkout' }
 $patchPath = Join-Path $driverRoot $lock.patches[0]
 if ((Get-FileHash -LiteralPath $patchPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $lock.patch_sha256) { throw 'CPR patch checksum does not match upstream-lock.json' }
-$existingDiff = (& git -C $upstreamPath diff --no-ext-diff) -join "`n"
+$existingDiff = (& git -C $upstreamPath diff --no-ext-diff --full-index) -join "`n"
 $untracked = & git -C $upstreamPath ls-files --others --exclude-standard
 if ($untracked) { throw 'CPR checkout contains untracked files; preserve them before preparing the dependency' }
 if ($existingDiff) {

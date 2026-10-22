@@ -33,6 +33,14 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	promptCacheKey string,
 	defaultMappedModel string,
 ) (forwardResult *OpenAIForwardResult, forwardErr error) {
+	if account.IsCPRManaged() {
+		preparedCtx, prepared, err := s.prepareCPRGatewayAccount(ctx, c, account)
+		if err != nil {
+			return nil, err
+		}
+		result, err := s.ForwardAsAnthropic(preparedCtx, c, prepared, body, promptCacheKey, defaultMappedModel)
+		return finishCPRGatewayResult(preparedCtx, c, result, err)
+	}
 	ctx, releaseDriverOperation, admissionErr := acquireOpenAIAccountDriverOperation(ctx, account)
 	if admissionErr != nil {
 		return nil, admissionErr

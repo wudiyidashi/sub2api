@@ -604,6 +604,14 @@ func (s *OpenAIGatewayService) ForwardImages(
 	parsed *OpenAIImagesRequest,
 	channelMappedModel string,
 ) (forwardResult *OpenAIForwardResult, forwardErr error) {
+	if account.IsCPRManaged() {
+		preparedCtx, prepared, err := s.prepareCPRGatewayAccount(ctx, c, account)
+		if err != nil {
+			return nil, err
+		}
+		result, err := s.ForwardImages(preparedCtx, c, prepared, body, parsed, channelMappedModel)
+		return finishCPRGatewayResult(preparedCtx, c, result, err)
+	}
 	ctx, releaseDriverOperation, admissionErr := acquireOpenAIAccountDriverOperation(ctx, account)
 	if admissionErr != nil {
 		return nil, admissionErr

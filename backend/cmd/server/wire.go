@@ -133,6 +133,8 @@ func provideCleanup(
 	pluginManager *service.PluginManager,
 	accountDriverMaintenance *service.AccountDriverMaintenanceService,
 	apiRequestAudit *service.APIRequestAuditService,
+	settingService *service.SettingService,
+	handlers *handler.Handlers,
 ) func() {
 	return func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -145,6 +147,18 @@ func provideCleanup(
 
 		// 应用层清理步骤可并行执行，基础设施资源（Redis/Ent）最后按顺序关闭。
 		parallelSteps := []cleanupStep{
+			{"CPRAccountPools", func() error {
+				if settingService != nil {
+					settingService.CPRPools().Stop()
+				}
+				return nil
+			}},
+			{"CPRManagement", func() error {
+				if handlers != nil && handlers.Admin != nil {
+					handlers.Admin.CPR.Close()
+				}
+				return nil
+			}},
 			{"APIRequestAudit", func() error {
 				if apiRequestAudit != nil {
 					apiRequestAudit.Stop()

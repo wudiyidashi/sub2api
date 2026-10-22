@@ -19,6 +19,9 @@ import (
 
 // Forward forwards request to OpenAI API
 func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, body []byte) (forwardResult *OpenAIForwardResult, forwardErr error) {
+	if account.IsCPRManaged() {
+		return s.forwardCPRResponses(ctx, c, account, body)
+	}
 	ctx, releaseDriverOperation, admissionErr := acquireOpenAIAccountDriverOperation(ctx, account)
 	if admissionErr != nil {
 		return nil, admissionErr

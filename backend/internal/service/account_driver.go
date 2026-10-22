@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/Wei-Shaw/sub2api/internal/accountdriver"
+	"github.com/Wei-Shaw/sub2api/internal/cpr"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 )
@@ -17,6 +18,7 @@ var (
 	accountDriverRegistryMu sync.RWMutex
 	accountDriverRegistry   = newAccountDriverRegistry(false, "unconfigured")
 	accountDriverWSKnown    bool
+	cprDriverAvailable      bool
 	accountDriverGeneration atomic.Uint64
 )
 
@@ -37,6 +39,12 @@ func newAccountDriverRegistry(available bool, version string) *accountdriver.Reg
 		Capabilities: native.Capabilities, LifecycleDriverID: accountdriver.NativeID,
 		ExecutionDriverID: AccountDriverCodexHTTP, TransportProtocols: protocols,
 		ExecutionEndpoints: []string{"responses"}, NativeDelegatedEndpoints: []string{"images", "search", "compact"},
+	}, accountdriver.Descriptor{
+		ID: accountdriver.CPRManagedID, Name: "CPR 托管", Version: cpr.SourceVersion, Available: cprDriverAvailable,
+		Platforms: []string{PlatformOpenAI, PlatformGrok}, AccountTypes: []string{AccountTypeAPIKey, AccountTypeUpstream},
+		LifecycleDriverID: accountdriver.CPRManagedID, ExecutionDriverID: accountdriver.CPRManagedID,
+		TransportProtocols: []string{"http", "sse", "websocket"},
+		ExecutionEndpoints: []string{"responses", "images", "search"},
 	})
 	if err != nil {
 		panic(err)
@@ -48,6 +56,14 @@ func accountDriverRegistrySnapshot() *accountdriver.Registry {
 	accountDriverRegistryMu.RLock()
 	defer accountDriverRegistryMu.RUnlock()
 	return accountDriverRegistry
+}
+
+func setCPRDriverAvailable(available bool) {
+	accountDriverRegistryMu.Lock()
+	defer accountDriverRegistryMu.Unlock()
+	cprDriverAvailable = available
+	codex, _ := accountDriverRegistry.Lookup(AccountDriverCodexHTTP)
+	accountDriverRegistry = newAccountDriverRegistry(codex.Available, codex.Version)
 }
 
 // SetAccountDriverRuntimeAvailability is called by the managed runtime on
@@ -111,6 +127,9 @@ func BuildAccountDriverCatalog() accountdriver.Catalog {
 // Managed implementations must be ready for new bindings. Settings have no
 // validated schema yet and must not be persisted in credentials or extra.
 func ValidateAccountDriverSelection(id string, settings map[string]any) error {
+	if strings.TrimSpace(id) == accountdriver.CPRManagedID {
+		return infraerrors.BadRequest("CPR_POOL_MANAGEMENT_REQUIRED", "manage CPR pools in the CPR account pool module")
+	}
 	if _, err := accountDriverRegistrySnapshot().Resolve(id); err != nil {
 		return err
 	}
@@ -170,6 +189,18 @@ func ValidateAccountDriverState(account *Account) error {
 	if account == nil || account.EffectiveAccountDriverID() == accountdriver.NativeID {
 		return nil
 	}
+	if account.IsCPRManaged() {
+		if account.Type == AccountTypeAPIKey {
+			_, err := account.CPRPoolBinding()
+			return err
+		}
+		if account.Type == AccountTypeUpstream && !account.Schedulable && account.ParentAccountID == nil && account.ProxyID == nil && len(account.Credentials) == 1 && strings.TrimSpace(account.GetCredential("cpr_account_id")) != "" {
+			if account.Platform == PlatformOpenAI || account.Platform == PlatformGrok {
+				return nil
+			}
+		}
+		return infraerrors.BadRequest("CPR_ACCOUNT_BINDING_INVALID", "CPR managed accounts must contain only a remote reference")
+	}
 	if err := validateAccountDriverCompatibility(account.EffectiveAccountDriverID(), account.Platform, account.Type, account.Credentials); err != nil {
 		return err
 	}
@@ -182,6 +213,9 @@ func ValidateAccountDriverState(account *Account) error {
 }
 
 func ValidateAccountDriverUpdate(account *Account, id string, settings map[string]any) error {
+	if account.IsCPRManaged() {
+		return infraerrors.BadRequest("CPR_POOL_MANAGEMENT_REQUIRED", "manage CPR pools in the CPR account pool module")
+	}
 	if len(settings) > 0 {
 		return infraerrors.BadRequest("ACCOUNT_DRIVER_SETTINGS_UNSUPPORTED", "this account driver does not support driver settings")
 	}

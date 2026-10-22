@@ -815,9 +815,12 @@ func ProvideOpsIngressRejectAggregator(opsRepo OpsRepository, opsService *OpsSer
 }
 
 // ProvideSettingService wires SettingService with group reader and proxy repo.
-func ProvideSettingService(settingRepo SettingRepository, groupRepo GroupRepository, proxyRepo ProxyRepository, cfg *config.Config, environmentProber RequestEnvironmentProber) *SettingService {
+func ProvideSettingService(settingRepo SettingRepository, groupRepo GroupRepository, proxyRepo ProxyRepository, accountRepo AccountRepository, apiKeyRepo APIKeyRepository, cfg *config.Config, environmentProber RequestEnvironmentProber) *SettingService {
 	svc := NewSettingService(settingRepo, cfg)
 	svc.requestEnvironments = NewAccountRequestEnvironmentService(settingRepo, environmentProber)
+	svc.cprPools = NewCPRPoolService(settingRepo, cfg)
+	svc.cprPools.accounts = accountRepo
+	svc.cprPools.keys = apiKeyRepo
 	svc.SetDefaultSubscriptionGroupReader(groupRepo)
 	svc.SetProxyRepository(proxyRepo)
 	if err := svc.LoadForwardedClientIPSettings(context.Background()); err != nil {
@@ -843,6 +846,7 @@ func ProvideSettingService(settingRepo SettingRepository, groupRepo GroupReposit
 	claude.SetCLIVersionResolver(func() string {
 		return svc.GetClaudeCodeClientVersion(context.Background())
 	})
+	svc.cprPools.Start()
 	return svc
 }
 

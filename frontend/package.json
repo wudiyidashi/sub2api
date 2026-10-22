@@ -6,17 +6,23 @@
   "scripts": {
     "dev": "vite --config vite.config.ts",
     "check:i18n": "vitest run src/i18n/__tests__/localeKeyCompleteness.spec.ts",
-    "build": "pnpm run check:i18n && vue-tsc -b && vite build && pnpm run build:team-stats",
+    "build": "pnpm run check:i18n && vue-tsc -b && vite build && pnpm run build:team-stats && pnpm run build:cpr-console",
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
     "lint:check": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts",
-    "typecheck": "vue-tsc --noEmit && pnpm run typecheck:team-stats",
+    "typecheck": "vue-tsc --noEmit && pnpm run typecheck:team-stats && pnpm run typecheck:cpr-console",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "build:team-stats": "pnpm run typecheck:team-stats && vite build --config subprojects/team-stats/vite.config.ts",
     "typecheck:team-stats": "vue-tsc --noEmit -p subprojects/team-stats/tsconfig.json",
-    "test:team-stats": "vitest run --config subprojects/team-stats/vitest.config.ts"
+    "test:team-stats": "vitest run --config subprojects/team-stats/vitest.config.ts",
+    "build:cpr-console": "node subprojects/cpr-console/run.mjs build",
+    "typecheck:cpr-console": "node subprojects/cpr-console/run.mjs typecheck",
+    "dev:cpr-console": "node subprojects/cpr-console/run.mjs dev"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "dependencies": {
     "@airwallex/components-sdk": "^1.30.2",
@@ -75,5 +81,6 @@
       "dompurify@<3.4.14": ">=3.4.14",
       "source-map-js@<1.2.2": ">=1.2.2"
     }
-  }
+  },
+  "packageManager": "pnpm@10.6.0+sha512.df0136e797db0cfa7ec1084e77f3bdf81bacbae9066832fbf95cba4c2140ad05e64f316cde51ce3f99ea00a91ffc702d6aedd3c0f450f895e3e7c052fe573cd8"
 }

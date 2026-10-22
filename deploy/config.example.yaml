@@ -1323,3 +1323,15 @@ image_storage:
   presign_expiry_hours: 24
   # 当上游返回的是图片 url 时，下载该图片再转存的字节上限（默认 32MB）
   max_download_bytes: 33554432
+
+# CPR 完整账号池：用户、API Key、套餐、支付、钱包和团队统计仍由 Sub2API 管理。
+# 默认关闭；base_url 指向仅内网可达的完整 CPR v3.29.7 服务，不能填写旧传输驱动地址。
+account_drivers:
+  cpr_managed:
+    enabled: false
+    base_url: "http://cpr-account-pool:8080"
+    admin_api_key: ""
+    deployment_id: "sub2api-production"
+    # 使用独立随机密钥（至少 32 字节），同一部署的多个实例保持一致。
+    bridge_secret: ""
+    admin_timeout_seconds: 30

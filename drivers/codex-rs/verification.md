@@ -1,5 +1,15 @@
 # 账号执行驱动验证记录
 
+## 2026-10-22 CPR 稳定版同步验证
+
+驱动 0.2.4 固定 CPR v3.29.7 / `78bc57c5cf24b01a38e985cdd739bb4ae89ce11f`（30 个新提交），Rust 1.99.1。维护补丁保留相同传输代码，使用完整 Git 对象哈希生成并核验，避免不同 checkout 的自动缩写长度影响重复校验。PowerShell 与 Shell 的 prepare 重复检查通过。
+
+Windows locked release 构建、格式检查和严格 release Clippy 通过。新二进制的 18 项协议合同与 15 项生产 runner 测试通过，覆盖 HTTP/SSE、原始正文与多值头、代理、许可、取消、背压、WebSocket 握手、原始帧、发送水位和不重放约束。依赖同步包含 rustls-webpki 0.103.16、serde_json 1.0.154、sha2 0.11.1、tokio-util 0.7.20、uuid 1.28.0 和 syn 3.0.9；本驱动使用 native roots，依赖图不包含 webpki-roots。
+
+账号池子项目、共享管理路由合同和完整服务版本握手同时固定到该提交。隔离环境使用校验 SHA256 的官方 Linux v3.29.7 进程，Responses JSON/SSE、Chat Completions、Anthropic Messages、授权模型目录及 WebSocket 计量与撤权验收通过。主面板、团队统计和 CPR 子项目生产构建、9 项相关前端测试、相关后端测试及生产依赖审计通过。
+
+以上是本地同步与隔离验收，不代表账号迁移和生产部署完成。Linux 传输驱动容器构建及真实 OAuth/Grok 账号未在本轮验收。
+
 ## 2026-10-19 上游同步验证
 
 Sub2API 同步 `Wei-Shaw/sub2api` 的 `b0a02a3304a0a78cdd003ddda1dd23ba02c03084`（48 个新提交）；驱动 0.2.3 固定 CPR v3.29.3 / `16d8a3f87309d9346a5f204673390fe20478b40e`（77 个新提交），使用 Rust 1.99.1。维护补丁重新生成并校验；宿主持有 prepared 请求、账号生命周期、重试预算与连接池的边界保持有效。

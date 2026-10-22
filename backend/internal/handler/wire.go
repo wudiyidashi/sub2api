@@ -12,6 +12,7 @@ import (
 
 // ProvideAdminHandlers creates the AdminHandlers struct
 func ProvideAdminHandlers(
+	cprHandler *admin.CPRHandler,
 	dashboardHandler *admin.DashboardHandler,
 	userHandler *admin.UserHandler,
 	groupHandler *admin.GroupHandler,
@@ -65,6 +66,7 @@ func ProvideAdminHandlers(
 	accountHandler.SetOpenCodeGoUsageService(opencodeGoUsage)
 	accountHandler.SetClaudeResetCreditService(claudeResetCredits)
 	return &AdminHandlers{
+		CPR:                    cprHandler,
 		Dashboard:              dashboardHandler,
 		User:                   userHandler,
 		Group:                  groupHandler,
@@ -271,6 +273,7 @@ var ProviderSet = wire.NewSet(
 	ProvideBatchImageHandler,
 
 	// Admin handlers
+	admin.NewCPRHandler,
 	admin.NewDashboardHandler,
 	admin.NewUserHandler,
 	admin.NewGroupHandlerWithConfig,

@@ -653,6 +653,18 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 	contentType string,
 ) (*OpenAIForwardResult, error) {
 	startTime := time.Now()
+	if account.IsCPRManaged() {
+		if endpoint != GrokMediaEndpointImagesGenerations && endpoint != GrokMediaEndpointImagesEdits {
+			return nil, writeCPRUnsupportedEndpoint(c, "Grok video")
+		}
+		preparedCtx, prepared, err := s.prepareCPRGatewayAccount(ctx, c, account)
+		if err != nil {
+			return nil, err
+		}
+		prepared.Platform = PlatformGrok
+		result, err := s.ForwardGrokMedia(preparedCtx, c, prepared, endpoint, requestID, body, contentType)
+		return finishCPRGatewayResult(preparedCtx, c, result, err)
+	}
 	if account == nil {
 		return nil, fmt.Errorf("grok account is required")
 	}
@@ -728,7 +740,7 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 		proxyURL = account.Proxy.URL()
 	}
 	upstreamStart := time.Now()
-	resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
+	resp, err := s.doOpenAIUpstream(upstreamReq, proxyURL, account)
 	SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
 	if err != nil {
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, false)
