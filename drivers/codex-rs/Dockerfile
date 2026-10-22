@@ -6,7 +6,7 @@ COPY --from=host-api account_driver.proto /workspace/backend/pkg/accountdriverap
 ENV CARGO_BUILD_JOBS=2
 RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/usr/local/cargo/git --mount=type=cache,target=/workspace/drivers/codex-rs/target cargo build --release --locked && cp target/release/sub2api-codex-account-driver /sub2api-codex-account-driver
 
-FROM golang:1.27.2-bookworm AS verification
+FROM golang:1.27.3-bookworm AS verification
 WORKDIR /workspace/backend
 COPY --from=host-go go.mod go.sum ./
 COPY --from=host-api . ./pkg/accountdriverapi/v1/

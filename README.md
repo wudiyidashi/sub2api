@@ -4,7 +4,7 @@
 
 # Sub2API
 
-[![Go](https://img.shields.io/badge/Go-1.27.0-00ADD8.svg)](https://golang.org/)
+[![Go](https://img.shields.io/badge/Go-1.27.3-00ADD8.svg)](https://golang.org/)
 [![Vue](https://img.shields.io/badge/Vue-3.4+-4FC08D.svg)](https://vuejs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-336791.svg)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7+-DC382D.svg)](https://redis.io/)
@@ -34,6 +34,7 @@ Please read the following carefully before using this project:
 - Codex accounts now detect location through their actual outbound proxy and align request timezone, local date, region, and search location for HTTP and WebSocket requests.
 - Account editing now previews the selected exit IP and timezone, with manual refresh. Failed detection stops Codex requests instead of using an outdated location.
 - Use a fixed or sticky proxy exit for consistent location; operating system, workspace paths, and language preferences retain their actual values.
+- Updated certificate verification and redirect handling dependencies to fix newly disclosed security issues.
 
 完整更新记录见 [docs/releases/release-notes.md](docs/releases/release-notes.md)。
 

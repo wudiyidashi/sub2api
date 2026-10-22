@@ -47,3 +47,4 @@
 - Codex accounts now detect location through their actual outbound proxy and align request timezone, local date, region, and search location for HTTP and WebSocket requests.
 - Account editing now previews the selected exit IP and timezone, with manual refresh. Failed detection stops Codex requests instead of using an outdated location.
 - Use a fixed or sticky proxy exit for consistent location; operating system, workspace paths, and language preferences retain their actual values.
+- Updated certificate verification and redirect handling dependencies to fix newly disclosed security issues.
