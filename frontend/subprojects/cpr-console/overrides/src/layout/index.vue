@@ -19,7 +19,9 @@ const tabs = [
       </RouterLink>
     </nav>
     <main class="min-h-0 min-w-0 flex-1 overflow-auto px-4 pb-4">
-      <RouterView v-slot="{ Component }"><component :is="Component" class="h-full min-h-0" /></RouterView>
+      <RouterView v-slot="{ Component, route }">
+        <component :is="Component" :class="route.name === 'accounts' ? 'min-h-full' : 'h-full min-h-0'" />
+      </RouterView>
     </main>
   </div>
 </template>

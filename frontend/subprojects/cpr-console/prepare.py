@@ -119,6 +119,27 @@ def main():
     if accounts.count(account_layout) != 1:
         raise RuntimeError("CPR account page scrolling changed")
     accounts = accounts.replace(account_layout, "flex min-h-0 w-full flex-col")
+    for original, replacement in (
+        (":account=\"row\" @show-concurrency=\"openConcurrency(row)\"", ":account=\"row\" @show-concurrency=\"openConcurrency(row)\" @show-quota=\"quotaAccountId = row.id\""),
+        ("[--cp-table-row-height:72px]", "[--cp-table-row-height:112px]"),
+        ('                :refreshing="refreshingAccountIds.has(row.id)"', '                :refreshing="refreshingAccountIds.has(row.id)"\n                :refreshing-quota="refreshingQuotaAccountIds.has(row.id)"'),
+        ('                @refresh="handleRefresh"', '                @refresh="handleRefresh"\n                @refresh-quota="handleRefreshQuota"\n                @show-quota="quotaAccountId = row.id"'),
+        ("import AccountConcurrencyModal from './components/AccountConcurrencyModal.vue'", "import AccountConcurrencyModal from './components/AccountConcurrencyModal.vue'\nimport AccountQuotaDialog from './components/AccountQuotaDialog.vue'"),
+        ("} = useAccountsQuery()", """} = useAccountsQuery()
+const quotaAccountId = ref<string | null>(null)
+const quotaAccount = computed(() => accounts.value.find(account => account.id === quotaAccountId.value) ?? null)
+const showQuotaDialog = computed({
+  get: () => quotaAccount.value !== null,
+  set: (open: boolean) => { if (!open) quotaAccountId.value = null },
+})"""),
+        ('    <AccountConcurrencyModal v-model="showConcurrency" :account="concurrencyAccount" />', '''    <AccountConcurrencyModal v-model="showConcurrency" :account="concurrencyAccount" />
+    <AccountQuotaDialog v-model="showQuotaDialog" :account="quotaAccount"
+      :refreshing="quotaAccountId !== null && refreshingQuotaAccountIds.has(quotaAccountId)"
+      @refresh-quota="handleRefreshQuota" @quota-reset="handleQuotaReset" @account-updated="void replaceAccount($event)" />'''),
+    ):
+        if accounts.count(original) != 1:
+            raise RuntimeError("CPR account quota actions changed; review the host adapter")
+        accounts = accounts.replace(original, replacement)
     vue_import = "import { ref, shallowRef } from 'vue'"
     columns = "const { visibleColumns, columnOptions, setColumnVisible, setColumnOrder, resetColumns } = useTableColumns(accountColumns, 'accounts')"
     if accounts.count(vue_import) != 1 or accounts.count(columns) != 1 or accounts.count(':columns="visibleColumns"') != 1:
@@ -128,13 +149,43 @@ def main():
 const compactActions = useMediaQuery('(max-width: 639px)')
 const responsiveColumns = computed(() => visibleColumns.value.map(column =>
   compactActions.value && column.key === 'actions'
-    ? { ...column, size: 'sm' as const, width: 44, minWidth: 44 }
+    ? { ...column, size: 'md' as const, width: 112, minWidth: 112 }
     : column,
 ))
 """)
     tracked[accounts_path] = accounts.replace(':columns="visibleColumns"', ':columns="responsiveColumns"').encode()
+    constants_path = "frontend/src/views/accounts/constants.ts"
+    constants = tracked[constants_path].decode()
+    for original, replacement in (
+        ("    size: '3xl',", "    size: 'lg',"),
+        ("    key: 'provider',", "    key: 'provider',\n    defaultHidden: true,"),
+        ("{ key: 'usage', label: '用量'", "{ key: 'usage', label: '额度 / 用量'"),
+        ("{ key: 'groups', label:", "{ key: 'groups', defaultHidden: true, label:"),
+        ("    key: 'lastUsedAt',", "    key: 'lastUsedAt',\n    defaultHidden: true,"),
+        ("    key: 'accessTokenExpiresAtDisplay',", "    key: 'accessTokenExpiresAtDisplay',\n    defaultHidden: true,"),
+        ("{ key: 'actions', label: '操作', kind: 'actions', size: 'lg'", "{ key: 'actions', label: '操作', kind: 'actions', size: 'xl'"),
+    ):
+        if constants.count(original) != 1:
+            raise RuntimeError("CPR account columns changed; review the embedded defaults")
+        constants = constants.replace(original, replacement)
+    tracked[constants_path] = constants.encode()
     actions_path = "frontend/src/views/accounts/components/AccountTableActions.vue"
     actions = tracked[actions_path].decode().replace("\r\n", "\n")
+    for original, replacement in (
+        ("  refreshing: boolean", "  refreshing: boolean\n  refreshingQuota: boolean"),
+        ("  edit: [account: Account]", "  edit: [account: Account]\n  showQuota: []\n  refreshQuota: [accountId: string]"),
+        ('  <div class="relative flex items-center justify-start gap-1">', '''  <div class="relative flex items-center justify-start gap-1">
+    <ZIconButton v-if="account.capabilities.quota" size="small" aria-label="额度详情" @click.stop="emit('showQuota')">
+      <ChartNoAxesCombined class="size-3.5 text-cp-link" />
+    </ZIconButton>
+    <ZIconButton v-if="account.capabilities.quotaRefresh" size="small" aria-label="刷新额度" :loading="refreshingQuota" :disabled="refreshingQuota" @click.stop="emit('refreshQuota', account.id)">
+      <RefreshCw class="size-3.5 text-cp-link" />
+    </ZIconButton>'''),
+        ("import { Download,", "import { ChartNoAxesCombined, Download,"),
+    ):
+        if actions.count(original) != 1:
+            raise RuntimeError("CPR quota action structure changed")
+        actions = actions.replace(original, replacement)
     for label in ("编辑账号", "删除账号"):
         marker = 'aria-label="' + label + '"'
         if actions.count(marker) != 1:

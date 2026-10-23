@@ -19,6 +19,7 @@
     "test:team-stats": "vitest run --config subprojects/team-stats/vitest.config.ts",
     "build:cpr-console": "node subprojects/cpr-console/run.mjs build",
     "typecheck:cpr-console": "node subprojects/cpr-console/run.mjs typecheck",
+    "test:cpr-console": "vitest run --config subprojects/cpr-console/vitest.config.ts",
     "dev:cpr-console": "node subprojects/cpr-console/run.mjs dev"
   },
   "engines": {

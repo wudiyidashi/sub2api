@@ -29,14 +29,11 @@ Please read the following carefully before using this project:
 
 ## 最新更新
 
-### 2026-10-22
+### 2026-10-23
 
-- Added an administrator CPR account-pool console with explicit business-group routing, while retaining Sub2API users, subscriptions, payments, wallet billing, and team statistics. Existing accounts require a controlled credential handover; compact and Grok video/voice remain unavailable on CPR-managed pools.
-- Updated the enhanced Codex transport to CPR v3.29.7 (driver 0.2.4), preserving prepared HTTP/SSE and WebSocket forwarding while adopting the upstream TLS security fixes.
-- Codex accounts now detect location through their actual outbound proxy and align request timezone, local date, region, and search location for HTTP and WebSocket requests.
-- Account editing now previews the selected exit IP and timezone, with manual refresh. Failed detection stops Codex requests instead of using an outdated location.
-- Use a fixed or sticky proxy exit for consistent location; operating system, workspace paths, and language preferences retain their actual values.
-- Updated certificate verification and redirect handling dependencies to fix newly disclosed security issues.
+- CPR account quotas now show usage percentages, reset times, and the last refresh directly in the account list, including accounts with no local requests and zero usage.
+- Added per-account quota details and refresh actions, with a dedicated details dialog for narrow screens.
+- Fixed clipped account rows and pagination in the embedded console; secondary columns remain available through the column selector.
 
 完整更新记录见 [docs/releases/release-notes.md](docs/releases/release-notes.md)。
 
