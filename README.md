@@ -31,6 +31,7 @@ Please read the following carefully before using this project:
 
 ### 2026-10-23
 
+- Updated HTML sanitization dependencies in both panels to address newly reported security issues.
 - CPR account quotas now show usage percentages, reset times, and the last refresh directly in the account list, including accounts with no local requests and zero usage.
 - Added per-account quota details and refresh actions, with a dedicated details dialog for narrow screens.
 - Fixed clipped account rows and pagination in the embedded console; secondary columns remain available through the column selector.

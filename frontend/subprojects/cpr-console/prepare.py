@@ -169,6 +169,16 @@ const responsiveColumns = computed(() => visibleColumns.value.map(column =>
             raise RuntimeError("CPR account columns changed; review the embedded defaults")
         constants = constants.replace(original, replacement)
     tracked[constants_path] = constants.encode()
+    quota_panel_path = "frontend/src/views/accounts/components/account-quota-panel/index.vue"
+    quota_panel = tracked[quota_panel_path].decode()
+    for original, replacement in (
+        ('class="mb-3 flex shrink-0 items-start justify-between gap-3"', 'class="mb-3 flex shrink-0 flex-wrap items-start justify-between gap-3"'),
+        ('<div class="min-w-0">', '<div class="min-w-0 flex-1 basis-48">'),
+    ):
+        if quota_panel.count(original) != 1:
+            raise RuntimeError("CPR quota header changed; review the narrow layout")
+        quota_panel = quota_panel.replace(original, replacement)
+    tracked[quota_panel_path] = quota_panel.encode()
     actions_path = "frontend/src/views/accounts/components/AccountTableActions.vue"
     actions = tracked[actions_path].decode().replace("\r\n", "\n")
     for original, replacement in (

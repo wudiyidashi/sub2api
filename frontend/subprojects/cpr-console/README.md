@@ -6,7 +6,7 @@
 
 ## 构建和开发
 
-`upstream-lock.json` 固定 CPR v3.29.7 和源码提交。`prepare.py` 校验管理合同及依赖基线后应用 `overrides/`，产物和依赖保存在忽略的 `.upstream/` 中。依赖锁包含 follow-redirects 1.16.1、Vite 8.3.4 安全修复。
+`upstream-lock.json` 固定 CPR v3.29.7 和源码提交。`prepare.py` 校验管理合同及依赖基线后应用 `overrides/`，产物和依赖保存在忽略的 `.upstream/` 中。依赖锁包含 follow-redirects 1.16.1、Vite 8.3.4，并覆盖 DOMPurify 3.4.17 安全修复。
 
 需要 Node.js 24、Python 3 和 Git。在 `frontend/` 运行：
 
